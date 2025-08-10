@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>StudyLife Dashboard</title>
+
+  <!-- Leaflet for map -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Pacifico&family=Segoe+UI:wght@400;600&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(to right, #3db1ff, #00bfff);
+      color: #333;
+    }
+
+    .header {
+      text-align: center;
+      padding-top: 30px;
+    }
+
+    .brand {
+      font-family: 'Pacifico', cursive;
+      font-size: 50px;
+      color: white;
+      margin: 0;
+    }
+
+    #userInfo {
+      position: fixed;
+      top: 120px;
+      left: 30px;
+      background: white;
+      padding: 20px 25px;
+      border-radius: 16px;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+      color: #007bff;
+      width: 240px;
+      text-align: center;
+      font-weight: bold;
+      font-size: 16px;
+    }
+
+    #userInfo p {
+      font-family: 'Pacifico', cursive;
+      font-size: 22px;
+      margin: 0 0 10px;
+    }
+
+    .logout {
+      background-color: #fff;
+      color: #007bff;
+      border: 2px solid #007bff;
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .logout:hover {
+      background-color: #007bff;
+      color: white;
+    }
+
+    #waterTracker {
+      position: fixed;
+      top: 330px;
+      left: 30px;
+      background: white;
+      padding: 20px 25px;
+      border-radius: 16px;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+      color: #007bff;
+      width: 240px;
+      text-align: center;
+      font-weight: bold;
+      font-size: 16px;
+    }
+
+    #waterTracker h3 {
+      margin-top: 0;
+    }
+
+    #waterTracker button {
+      margin: 5px 4px 0;
+      padding: 6px 10px;
+      font-size: 14px;
+      border-radius: 6px;
+      border: 1px solid #007bff;
+      background-color: #007bff;
+      color: white;
+      cursor: pointer;
+    }
+
+    #waterTracker button:hover {
+      background-color: #005bbb;
+    }
+
+    .container {
+      background: white;
+      max-width: 900px;
+      margin: 30px auto;
+      padding: 20px;
+      border-radius: 15px;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+    }
+
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+      font-size: 24px;
+    }
+
+    .calendar-nav {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 15px;
+      margin-bottom: 15px;
+    }
+
+    .calendar-nav button {
+      background-color: #0099ff;
+      color: white;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    #monthTitle {
+      font-size: 18px;
+      font-weight: bold;
+    }
+
+    .card-container {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 20px;
+      max-width: 900px;
+      margin: 30px auto;
+    }
+
+    .card {
+      background: white;
+      padding: 20px 30px;
+      border-radius: 15px;
+      text-decoration: none;
+      color: #007bff;
+      font-weight: bold;
+      font-size: 18px;
+      text-align: center;
+      flex: 1 1 180px;
+      transition: transform 0.2s, box-shadow 0.2s;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15);
+    }
+
+    #calendar {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 8px;
+      text-align: center;
+      margin-top: 10px;
+    }
+
+    .day-header {
+      font-weight: bold;
+      color: #007bff;
+    }
+
+    .today {
+      background-color: #ffd54f;
+      font-weight: bold;
+      border-radius: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1 class="brand">StudyLife</h1>
+  </div>
+
+  <div id="userInfo">
+    <p>Welcome, <span id="username">123</span></p>
+    <button class="logout" onclick="logout()">Logout</button>
+  </div>
+
+  <div id="waterTracker">
+    <h3>Water</h3>
+    <p id="waterAmount">0 / 2000 ml</p>
+    <button onclick="addWater(100)">+100ml</button>
+    <button onclick="addWater(250)">+250ml</button>
+    <button onclick="addWater(500)">+500ml</button>
+  </div>
+
+  <div class="container">
+    <h2>📅 Monthly Calendar</h2>
+    <div class="calendar-nav">
+      <button id="prevMonth">⬅️ Previous</button>
+      <span id="monthTitle">Loading...</span>
+      <button id="nextMonth">Next ➔</button>
+    </div>
+    <div id="calendar"></div>
+  </div>
+
+  <div class="card-container">
+    <a href="todo.html" class="card">📝 To-Do List</a>
+    <a href="expense.html" class="card">💸 Expense Tracker</a>
+    <a href="mood.html" class="card">😊 Mood Tracker</a>
+    <a href="reminder.html" class="card">⏰ Reminders</a>
+  </div>
+
+  <div class="container">
+    <h2>🌦️ Weather Forecast</h2>
+    <div id="weatherDisplay">Loading weather...</div>
+  </div>
+
+  <div class="container">
+    <h2>📍 Your Location</h2>
+    <div id="map" style="height: 300px; width: 100%; border: 1px solid #ccc;"></div>
+  </div>
+
+  <script src="js/dashboard.js"></script>
+</body>
+</html>
