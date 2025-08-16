@@ -14,14 +14,15 @@ import org.mindrot.jbcrypt.BCrypt;
 public class LoginServlet extends HttpServlet {
 
     /* ===== 常量：字段名 / 文本 ===== */
-    private static final String FIELD_STATUS   = "status";
-    private static final String FIELD_MESSAGE  = "message";
-    private static final String FIELD_USER_ID  = "userId";
-    private static final String FIELD_USERNAME = "username";
+    private static final String FIELD_STATUS    = "status";
+    private static final String FIELD_MESSAGE   = "message";
+    private static final String FIELD_USER_ID   = "userId";
+    private static final String FIELD_USERNAME  = "username";
+    private static final String FIELD_PASSWORD  = "password";
 
-    private static final String STATUS_SUCCESS = "success";
-    private static final String STATUS_FAIL    = "fail";
-    private static final String STATUS_ERROR   = "error";
+    private static final String STATUS_SUCCESS  = "success";
+    private static final String STATUS_FAIL     = "fail";
+    private static final String STATUS_ERROR    = "error";
 
     private static final String MSG_INVALID_JSON        = "Invalid JSON";
     private static final String MSG_INVALID_BODY        = "Invalid request body";
@@ -105,8 +106,8 @@ public class LoginServlet extends HttpServlet {
         final String password;
         try {
             JSONObject json = new JSONObject(body);
-            username = json.optString("username", "").trim();
-            password = json.optString("password", "");
+            username = json.optString(FIELD_USERNAME, "").trim(); // ✅ 使用常量
+            password = json.optString(FIELD_PASSWORD, "");        // ✅ 使用常量
         } catch (Exception ex) {
             result.put(FIELD_STATUS, STATUS_FAIL).put(FIELD_MESSAGE, MSG_INVALID_JSON);
             sendJson(response, HttpServletResponse.SC_BAD_REQUEST, result);
