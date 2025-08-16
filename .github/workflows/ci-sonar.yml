@@ -22,11 +22,20 @@ jobs:
           java-version: '11'
           cache: maven
 
-      # 先编译并跑测试，生成 target/classes
-      - name: Build & Test
-        run: mvn -B clean verify
+      # 预热依赖，降低首次构建失败概率
+      - name: Warm up Maven dependencies
+        run: |
+          mvn -B -U \
+            -Dmaven.wagon.http.retryHandler.count=5 \
+            -Dmaven.wagon.http.pool=false \
+            dependency:go-offline
 
-      # 用 Maven 执行 Sonar 分析（推荐方式）
+      - name: Build & Test
+        run: |
+          mvn -B clean verify \
+            -Dmaven.wagon.http.retryHandler.count=5 \
+            -Dmaven.wagon.http.pool=false
+
       - name: SonarCloud Scan (Maven)
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -35,4 +44,6 @@ jobs:
             -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }} \
             -Dsonar.organization=${{ secrets.SONAR_ORG }} \
             -Dsonar.host.url=https://sonarcloud.io \
-            -Dsonar.login=${SONAR_TOKEN}
+            -Dsonar.login=${SONAR_TOKEN} \
+            -Dmaven.wagon.http.retryHandler.count=5 \
+            -Dmaven.wagon.http.pool=false

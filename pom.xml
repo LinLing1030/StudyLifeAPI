@@ -42,14 +42,14 @@
       <version>0.4</version>
     </dependency>
 
-    <!-- JavaMail -->
+    <!-- JavaMail (javax.mail) -->
     <dependency>
       <groupId>com.sun.mail</groupId>
       <artifactId>javax.mail</artifactId>
       <version>1.6.2</version>
     </dependency>
 
-    <!-- Activation -->
+    <!-- Activation (javax.activation) -->
     <dependency>
       <groupId>com.sun.activation</groupId>
       <artifactId>javax.activation</artifactId>
@@ -74,9 +74,17 @@
           <release>11</release>
         </configuration>
       </plugin>
+
       <plugin>
         <artifactId>maven-war-plugin</artifactId>
         <version>3.4.0</version>
+      </plugin>
+
+      <!-- ✅ Sonar 官方推荐：用 Maven 插件执行分析 -->
+      <plugin>
+        <groupId>org.sonarsource.scanner.maven</groupId>
+        <artifactId>sonar-maven-plugin</artifactId>
+        <version>3.9.1.2184</version>
       </plugin>
     </plugins>
   </build>
