@@ -7,11 +7,26 @@ import java.util.Properties;
 
 public class EmailUtil {
 
+    /* ====== 配置键常量（避免重复写字符串） ====== */
+    private static final String KEY_MAIL_FROM      = "MAIL_FROM";
+    private static final String KEY_MAIL_USERNAME  = "MAIL_USERNAME";
+    private static final String KEY_MAIL_PASSWORD  = "MAIL_PASSWORD";
+    private static final String KEY_SMTP_HOST      = "MAIL_SMTP_HOST";
+    private static final String KEY_SMTP_PORT      = "MAIL_SMTP_PORT";
+    private static final String KEY_STARTTLS       = "MAIL_STARTTLS";
+    private static final String KEY_SSL            = "MAIL_SSL";
+
+    /* ====== 默认值常量 ====== */
+    private static final String DEF_SMTP_HOST   = "smtp.gmail.com";
+    private static final String DEF_SMTP_PORT   = "587";
+    private static final String DEF_STARTTLS    = "true";   // 587 常用
+    private static final String DEF_SSL         = "false";  // 465 常用 true
+
     /** 读取配置：优先环境变量，其次 -Dsystem property；required=true 时未配置会抛错 */
     private static String cfg(String key, String def, boolean required) {
         String v = System.getenv(key);
         if (v == null || v.isBlank()) v = System.getProperty(key);
-        if ((v == null || v.isBlank())) {
+        if (v == null || v.isBlank()) {
             if (required) throw new IllegalStateException("Missing mail config: " + key);
             return def;
         }
@@ -24,20 +39,13 @@ public class EmailUtil {
     }
 
     private static Session buildSession() {
-        // 这些键都可用环境变量或 -D 传入
-        // 常用键：
-        // MAIL_FROM / MAIL_USERNAME：发件人账号（Gmail/SES SMTP 用户名）
-        // MAIL_PASSWORD：密码或 SMTP 密钥
-        // MAIL_SMTP_HOST：SMTP 主机（Gmail: smtp.gmail.com；SES: email-smtp.<region>.amazonaws.com）
-        // MAIL_SMTP_PORT：587 或 465
-        // MAIL_STARTTLS：true/false（587 通常用 true）
-        // MAIL_SSL：true/false（465 通常用 true）
-        final String username = cfg("MAIL_USERNAME", cfg("MAIL_FROM", null, true), true);
-        final String password = cfg("MAIL_PASSWORD", null, true);
-        final String host     = cfg("MAIL_SMTP_HOST", "smtp.gmail.com", false); // 若用 SES，请设置为 email-smtp.<region>.amazonaws.com
-        final String port     = cfg("MAIL_SMTP_PORT", "587", false);
-        final boolean startTLS= Boolean.parseBoolean(cfg("MAIL_STARTTLS", "true", false));
-        final boolean ssl     = Boolean.parseBoolean(cfg("MAIL_SSL", "false", false));
+        // 读取账号/密码与 SMTP 参数
+        final String username = cfg(KEY_MAIL_USERNAME, cfg(KEY_MAIL_FROM, null, true), true);
+        final String password = cfg(KEY_MAIL_PASSWORD, null, true);
+        final String host     = cfg(KEY_SMTP_HOST, DEF_SMTP_HOST, false);
+        final String port     = cfg(KEY_SMTP_PORT, DEF_SMTP_PORT, false);
+        final boolean startTLS= Boolean.parseBoolean(cfg(KEY_STARTTLS, DEF_STARTTLS, false));
+        final boolean ssl     = Boolean.parseBoolean(cfg(KEY_SSL, DEF_SSL, false));
 
         Properties props = new Properties();
         props.put("mail.smtp.host", host);
@@ -45,7 +53,7 @@ public class EmailUtil {
         props.put("mail.smtp.auth", "true");
         props.put("mail.smtp.starttls.enable", String.valueOf(startTLS));
         props.put("mail.smtp.ssl.enable", String.valueOf(ssl));
-        // 连接超时设置，避免云上网络偶发卡死
+        // 超时设置，云环境更稳
         props.put("mail.smtp.connectiontimeout", "10000");
         props.put("mail.smtp.timeout", "20000");
         props.put("mail.smtp.writetimeout", "20000");
@@ -61,7 +69,7 @@ public class EmailUtil {
     public static void sendEmail(String toEmail, String subject, String messageText) throws MessagingException {
         final Session session = Holder.SESSION;
 
-        String from = cfg("MAIL_FROM", cfg("MAIL_USERNAME", null, true), true);
+        String from = cfg(KEY_MAIL_FROM, cfg(KEY_MAIL_USERNAME, null, true), true);
 
         MimeMessage msg = new MimeMessage(session);
         msg.setFrom(new InternetAddress(from));
@@ -71,11 +79,11 @@ public class EmailUtil {
         Transport.send(msg);
     }
 
-    /** 发送 HTML 邮件（需要时可用） */
+    /** 发送 HTML 邮件 */
     public static void sendHtmlEmail(String toEmail, String subject, String html) throws MessagingException {
         final Session session = Holder.SESSION;
 
-        String from = cfg("MAIL_FROM", cfg("MAIL_USERNAME", null, true), true);
+        String from = cfg(KEY_MAIL_FROM, cfg(KEY_MAIL_USERNAME, null, true), true);
 
         MimeMessage msg = new MimeMessage(session);
         msg.setFrom(new InternetAddress(from));
