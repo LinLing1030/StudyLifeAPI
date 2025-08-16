@@ -22,20 +22,15 @@ jobs:
           java-version: '11'
           cache: maven
 
-      # ❶ 生成 JaCoCo 覆盖率报告 (target/site/jacoco/jacoco.xml)
-      - name: Build & Test (with JaCoCo)
-        run: mvn -B clean verify
-
-      # ❷ Sonar 扫描，并指向 jacoco.xml
-      # ❸ 可选：临时排除前端/Servlet 覆盖率，减少 "Lines to cover" 压力
-      - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@v2
+      # 一条 Maven 命令同时完成：编译+测试(生成 JaCoCo)+Sonar 扫描
+      - name: Build, Test, and Analyze with Maven
+        run: >
+          mvn -B clean verify
+          org.sonarsource.scanner.maven:sonar-maven-plugin:sonar
+          -Dsonar.projectKey=LinLing1030_StudyLifeAPI
+          -Dsonar.organization=linling1030
+          -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+          -Dsonar.coverage.exclusions=src/main/webapp/**,src/main/webapp/js/**,src/main/webapp/css/**,src/main/webapp/**/*.html
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        with:
-          args: >
-            -Dsonar.projectKey=LinLing1030_StudyLifeAPI
-            -Dsonar.organization=linling1030
-            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
-            -Dsonar.coverage.exclusions=src/main/webapp/**,src/main/webapp/js/**,src/main/webapp/css/**,src/main/webapp/**/*.html
