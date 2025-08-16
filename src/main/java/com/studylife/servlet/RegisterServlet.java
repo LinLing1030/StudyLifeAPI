@@ -1,12 +1,18 @@
 package com.studylife.servlet;
 
-import javax.servlet.http.*;
-import javax.naming.*;
+import javax.naming.Context;
+import javax.naming.InitialContext;
+import javax.naming.NamingException;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import javax.sql.DataSource;
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.UnsupportedEncodingException;
 import java.sql.*;
 import java.util.Set;
-
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.mindrot.jbcrypt.BCrypt;
@@ -33,12 +39,25 @@ public class RegisterServlet extends HttpServlet {
 
     private static final String CT_JSON_UTF8 = "application/json;charset=UTF-8";
 
-    // 允许的前端来源（按需增减；不要用 *）
+    // 允许来源
     private static final Set<String> ALLOWED_ORIGINS = Set.of(
         "http://localhost:3000",
         "http://localhost:5500",
-        "https://studylife.example"   // TODO: 替换为你的正式域名
+        "https://studylife.example"
     );
+
+    /* ===== 工具：安全 put 与统一输出 ===== */
+    private static void safePut(JSONObject obj, String k, Object v) {
+        try { obj.put(k, v); } catch (JSONException ignored) { }
+    }
+
+    private static void sendJson(HttpServletResponse resp, int httpCode, JSONObject json) {
+        resp.setStatus(httpCode);
+        resp.setContentType(CT_JSON_UTF8);
+        try (PrintWriter out = resp.getWriter()) {
+            out.write(json.toString());
+        } catch (IOException ignored) { }
+    }
 
     /* ===== CORS ===== */
     private void setCors(HttpServletRequest req, HttpServletResponse resp) {
@@ -46,7 +65,6 @@ public class RegisterServlet extends HttpServlet {
         if (origin != null && ALLOWED_ORIGINS.contains(origin)) {
             resp.setHeader("Access-Control-Allow-Origin", origin);
             resp.setHeader("Vary", "Origin");
-            // resp.setHeader("Access-Control-Allow-Credentials", "true");
         }
         resp.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
         resp.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
@@ -68,34 +86,18 @@ public class RegisterServlet extends HttpServlet {
         return (DataSource) envCtx.lookup("jdbc/StudyLife");
     }
 
-    /* ===== JSON 帮助 ===== */
-    private static void safePut(JSONObject obj, String k, Object v) {
-        try { obj.put(k, v); } catch (JSONException ignore) { /* log if needed */ }
-    }
-
-    private static void sendJson(HttpServletResponse resp, int httpCode, JSONObject json) {
-        resp.setStatus(httpCode);
-        resp.setContentType(CT_JSON_UTF8);
-        try (PrintWriter out = resp.getWriter()) {
-            out.write(json.toString());
-        } catch (IOException ioe) {
-            ioe.printStackTrace();
-        }
-    }
-
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response) {
         setCors(request, response);
         try {
             request.setCharacterEncoding("UTF-8");
         } catch (UnsupportedEncodingException e) {
-            JSONObject r = new JSONObject();
-            safePut(r, FIELD_STATUS, STATUS_FAIL);
-            safePut(r, FIELD_MESSAGE, MSG_INVALID_BODY);
-            sendJson(response, HttpServletResponse.SC_BAD_REQUEST, r);
+            JSONObject err = new JSONObject();
+            safePut(err, FIELD_STATUS, STATUS_FAIL);
+            safePut(err, FIELD_MESSAGE, MSG_INVALID_BODY);
+            sendJson(response, HttpServletResponse.SC_BAD_REQUEST, err);
             return;
         }
-        response.setCharacterEncoding("UTF-8");
 
         JSONObject result = new JSONObject();
 
@@ -137,12 +139,13 @@ public class RegisterServlet extends HttpServlet {
             return;
         }
 
-        // 检查重名 & 写入哈希
+        // 业务：检查重名 & 写入哈希
         try {
             DataSource ds = getDataSource();
+
             try (Connection conn = ds.getConnection()) {
 
-                // 先检查是否已存在
+                // 检查是否存在
                 final String checkSql = "SELECT id FROM users WHERE username = ?";
                 try (PreparedStatement ps = conn.prepareStatement(checkSql)) {
                     ps.setString(1, username);
@@ -159,7 +162,7 @@ public class RegisterServlet extends HttpServlet {
                 // 计算密码哈希
                 final String hash = BCrypt.hashpw(password, BCrypt.gensalt(12));
 
-                // 插入（列名 password_hash，如不同请按你的表修改）
+                // 插入
                 final String insertSql = "INSERT INTO users (username, password_hash) VALUES (?, ?)";
                 try (PreparedStatement ps = conn.prepareStatement(insertSql)) {
                     ps.setString(1, username);

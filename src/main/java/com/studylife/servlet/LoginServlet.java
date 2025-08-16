@@ -1,12 +1,21 @@
 package com.studylife.servlet;
 
-import javax.servlet.http.*;
-import javax.naming.*;
+import javax.naming.Context;
+import javax.naming.InitialContext;
+import javax.naming.NamingException;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import javax.sql.DataSource;
-import java.io.*;
-import java.sql.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.UnsupportedEncodingException;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.Set;
-
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.mindrot.jbcrypt.BCrypt;
@@ -32,12 +41,25 @@ public class LoginServlet extends HttpServlet {
 
     private static final String CT_JSON_UTF8 = "application/json;charset=UTF-8";
 
-    // 允许的前端来源（按需增减；不要用 *）
+    // 允许来源
     private static final Set<String> ALLOWED_ORIGINS = Set.of(
         "http://localhost:3000",
         "http://localhost:5500",
-        "https://studylife.example"   // TODO: 替换为你的正式域名
+        "https://studylife.example"
     );
+
+    /* ===== 工具：安全 put 与统一输出 ===== */
+    private static void safePut(JSONObject obj, String k, Object v) {
+        try { obj.put(k, v); } catch (JSONException ignored) { /* never mind */ }
+    }
+
+    private static void sendJson(HttpServletResponse resp, int httpCode, JSONObject json) {
+        resp.setStatus(httpCode);
+        resp.setContentType(CT_JSON_UTF8);
+        try (PrintWriter out = resp.getWriter()) {
+            out.write(json.toString());
+        } catch (IOException ignored) { /* 响应流已关闭或网络中断，不再额外处理 */ }
+    }
 
     /* ===== CORS ===== */
     private void setCors(HttpServletRequest req, HttpServletResponse resp) {
@@ -45,12 +67,10 @@ public class LoginServlet extends HttpServlet {
         if (origin != null && ALLOWED_ORIGINS.contains(origin)) {
             resp.setHeader("Access-Control-Allow-Origin", origin);
             resp.setHeader("Vary", "Origin");
-            // resp.setHeader("Access-Control-Allow-Credentials", "true");
         }
         resp.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
         resp.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
         resp.setHeader("Access-Control-Max-Age", "3600");
-
         resp.setHeader("X-Content-Type-Options", "nosniff");
         resp.setHeader("Cache-Control", "no-store");
     }
@@ -68,40 +88,23 @@ public class LoginServlet extends HttpServlet {
         return (DataSource) envCtx.lookup("jdbc/StudyLife");
     }
 
-    /* ===== JSON 帮助 ===== */
-    private static void safePut(JSONObject obj, String k, Object v) {
-        try { obj.put(k, v); } catch (JSONException ignore) { /* log if needed */ }
-    }
-
-    private static void sendJson(HttpServletResponse resp, int httpCode, JSONObject json) {
-        resp.setStatus(httpCode);
-        resp.setContentType(CT_JSON_UTF8);
-        try (PrintWriter out = resp.getWriter()) {
-            out.write(json.toString());
-        } catch (IOException ioe) {
-            // 最后兜底：无法写出时仅记录
-            ioe.printStackTrace();
-        }
-    }
-
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response) {
         setCors(request, response);
         try {
             request.setCharacterEncoding("UTF-8");
         } catch (UnsupportedEncodingException e) {
-            JSONObject result = new JSONObject();
-            safePut(result, FIELD_STATUS, STATUS_FAIL);
-            safePut(result, FIELD_MESSAGE, MSG_INVALID_BODY);
-            sendJson(response, HttpServletResponse.SC_BAD_REQUEST, result);
+            JSONObject err = new JSONObject();
+            safePut(err, FIELD_STATUS, STATUS_FAIL);
+            safePut(err, FIELD_MESSAGE, MSG_INVALID_BODY);
+            sendJson(response, HttpServletResponse.SC_BAD_REQUEST, err);
             return;
         }
-        response.setCharacterEncoding("UTF-8");
 
         JSONObject result = new JSONObject();
 
-        // 读取 JSON body
-        final String body;
+        // 读取 JSON
+        String body;
         try (BufferedReader r = request.getReader()) {
             StringBuilder sb = new StringBuilder(256);
             String line;
@@ -114,12 +117,10 @@ public class LoginServlet extends HttpServlet {
             return;
         }
 
-        // 解析 JSON
-        final String username;
-        final String password;
+        String username, password;
         try {
             JSONObject json = new JSONObject(body);
-            username = json.optString("username", "").trim();
+            username = json.optString(FIELD_USERNAME, "").trim();
             password = json.optString("password", "");
         } catch (Exception ex) {
             safePut(result, FIELD_STATUS, STATUS_FAIL);
@@ -138,7 +139,6 @@ public class LoginServlet extends HttpServlet {
             return;
         }
 
-        // 业务：校验密码哈希
         try {
             DataSource ds = getDataSource();
 
@@ -166,7 +166,6 @@ public class LoginServlet extends HttpServlet {
                         return;
                     }
 
-                    // 登录成功
                     safePut(result, FIELD_STATUS, STATUS_SUCCESS);
                     safePut(result, FIELD_USER_ID, userId);
                     safePut(result, FIELD_USERNAME, username);
