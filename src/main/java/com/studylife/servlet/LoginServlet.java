@@ -2,79 +2,173 @@ package com.studylife.servlet;
 
 import javax.servlet.*;
 import javax.servlet.http.*;
+import javax.naming.*;
+import javax.sql.DataSource;
 import java.io.*;
 import java.sql.*;
+import java.util.Set;
+
 import org.json.JSONObject;
+import org.mindrot.jbcrypt.BCrypt;
 
 public class LoginServlet extends HttpServlet {
 
-    // === CORS ===
-    private void setCors(HttpServletResponse resp) {
-        resp.setHeader("Access-Control-Allow-Origin", "*");
-        resp.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
+    /* ===== 常量：字段名 / 文本 ===== */
+    private static final String FIELD_STATUS   = "status";
+    private static final String FIELD_MESSAGE  = "message";
+    private static final String FIELD_USER_ID  = "userId";
+    private static final String FIELD_USERNAME = "username";
+
+    private static final String STATUS_SUCCESS = "success";
+    private static final String STATUS_FAIL    = "fail";
+    private static final String STATUS_ERROR   = "error";
+
+    private static final String MSG_INVALID_JSON        = "Invalid JSON";
+    private static final String MSG_INVALID_BODY        = "Invalid request body";
+    private static final String MSG_INVALID_CREDENTIALS = "Invalid credentials";
+    private static final String MSG_SERVER_CONFIG_ERROR = "Server config error";
+    private static final String MSG_DB_ERROR            = "Database error";
+    private static final String MSG_SERVER_ERROR        = "Server error";
+
+    private static final String CT_JSON_UTF8 = "application/json;charset=UTF-8";
+
+    // 允许的前端来源（按需增减；不要用 *）
+    private static final Set<String> ALLOWED_ORIGINS = Set.of(
+        "http://localhost:3000",
+        "http://localhost:5500",
+        "https://studylife.example"   // TODO: 替换为你的正式域名
+    );
+
+    /* ===== CORS ===== */
+    private void setCors(HttpServletRequest req, HttpServletResponse resp) {
+        String origin = req.getHeader("Origin");
+        if (origin != null && ALLOWED_ORIGINS.contains(origin)) {
+            resp.setHeader("Access-Control-Allow-Origin", origin);
+            resp.setHeader("Vary", "Origin");
+            // 如需携带 Cookie，解开下一行，并在前端 fetch 开启 credentials
+            // resp.setHeader("Access-Control-Allow-Credentials", "true");
+        }
+        resp.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
         resp.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
         resp.setHeader("Access-Control-Max-Age", "3600");
+
+        // 安全响应头（可加分）
+        resp.setHeader("X-Content-Type-Options", "nosniff");
+        resp.setHeader("Cache-Control", "no-store");
     }
 
     @Override
     protected void doOptions(HttpServletRequest req, HttpServletResponse resp) throws IOException {
-        setCors(resp);
+        setCors(req, resp);
         resp.setStatus(HttpServletResponse.SC_NO_CONTENT);
     }
 
-    @Override
-    protected void doPost(HttpServletRequest request, HttpServletResponse response)
-            throws IOException {
+    /* ===== JNDI DataSource ===== */
+    private DataSource getDataSource() throws NamingException {
+        Context initCtx = new InitialContext();
+        Context envCtx  = (Context) initCtx.lookup("java:/comp/env");
+        return (DataSource) envCtx.lookup("jdbc/StudyLife");
+    }
 
-        setCors(response);
-        response.setContentType("application/json;charset=UTF-8");
-
-        StringBuilder sb = new StringBuilder();
-        try (BufferedReader r = request.getReader()) {
-            String line;
-            while ((line = r.readLine()) != null) sb.append(line);
+    /* ===== JSON 输出工具 ===== */
+    private static void sendJson(HttpServletResponse resp, int httpCode, JSONObject json) throws IOException {
+        resp.setStatus(httpCode);
+        resp.setContentType(CT_JSON_UTF8);
+        try (PrintWriter out = resp.getWriter()) {
+            out.write(json.toString());
         }
+    }
+
+    @Override
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        setCors(request, response);
+        request.setCharacterEncoding("UTF-8");
+        response.setCharacterEncoding("UTF-8");
 
         JSONObject result = new JSONObject();
 
-        try {
-            JSONObject json = new JSONObject(sb.toString());
-            String username = json.optString("username", "").trim();
-            String password = json.optString("password", "").trim();
-
-            if (username.isEmpty() || password.isEmpty()) {
-                result.put("status", "fail").put("message", "Username or password empty.");
-                response.getWriter().write(result.toString());
-                return;
-            }
-
-            Class.forName("com.mysql.cj.jdbc.Driver");
-            try (Connection conn = DriverManager.getConnection(
-            		"jdbc:mysql://127.0.0.1:3306/studylife_db?serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true",
-                "studyuser",
-                "Study2025!"
-            )) {
-
-                try (PreparedStatement ps = conn.prepareStatement(
-                        "SELECT id FROM users WHERE username = ? AND password = ?")) {
-                    ps.setString(1, username);
-                    ps.setString(2, password); // 演示用明文，实际请改为哈希
-                    try (ResultSet rs = ps.executeQuery()) {
-                        if (rs.next()) {
-                            result.put("status", "success");
-                            result.put("userId", rs.getInt("id"));
-                        } else {
-                            result.put("status", "fail").put("message", "Invalid credentials.");
-                        }
-                    }
-                }
-            }
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            result.put("status", "error").put("message", e.getMessage());
+        // 读取 JSON body
+        final String body;
+        try (BufferedReader r = request.getReader()) {
+            StringBuilder sb = new StringBuilder(256);
+            String line;
+            while ((line = r.readLine()) != null) sb.append(line);
+            body = sb.toString();
+        } catch (IOException e) {
+            result.put(FIELD_STATUS, STATUS_FAIL).put(FIELD_MESSAGE, MSG_INVALID_BODY);
+            sendJson(response, HttpServletResponse.SC_BAD_REQUEST, result);
+            return;
         }
 
-        response.getWriter().write(result.toString());
+        // 解析 JSON
+        final String username;
+        final String password;
+        try {
+            JSONObject json = new JSONObject(body);
+            username = json.optString("username", "").trim();
+            password = json.optString("password", "");
+        } catch (Exception ex) {
+            result.put(FIELD_STATUS, STATUS_FAIL).put(FIELD_MESSAGE, MSG_INVALID_JSON);
+            sendJson(response, HttpServletResponse.SC_BAD_REQUEST, result);
+            return;
+        }
+
+        // 基础校验（避免空值/超长）
+        if (username.isEmpty() || password.isEmpty()
+                || username.length() < 3 || username.length() > 64
+                || password.length() < 6 || password.length() > 128) {
+            result.put(FIELD_STATUS, STATUS_FAIL).put(FIELD_MESSAGE, MSG_INVALID_CREDENTIALS);
+            sendJson(response, HttpServletResponse.SC_OK, result);
+            return;
+        }
+
+        // 业务：校验密码哈希
+        try {
+            DataSource ds = getDataSource();
+
+            // 只按用户名取哈希，避免在 SQL 中比较明文密码
+            final String sql = "SELECT id, password_hash FROM users WHERE username = ?";
+            try (Connection conn = ds.getConnection();
+                 PreparedStatement ps = conn.prepareStatement(sql)) {
+
+                ps.setString(1, username);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (!rs.next()) {
+                        // 统一失败信息，避免账户枚举
+                        result.put(FIELD_STATUS, STATUS_FAIL).put(FIELD_MESSAGE, MSG_INVALID_CREDENTIALS);
+                        sendJson(response, HttpServletResponse.SC_OK, result);
+                        return;
+                    }
+
+                    long userId = rs.getLong("id");
+                    String hash = rs.getString("password_hash");
+
+                    boolean ok = (hash != null && !hash.isEmpty()) && BCrypt.checkpw(password, hash);
+                    if (!ok) {
+                        result.put(FIELD_STATUS, STATUS_FAIL).put(FIELD_MESSAGE, MSG_INVALID_CREDENTIALS);
+                        sendJson(response, HttpServletResponse.SC_OK, result);
+                        return;
+                    }
+
+                    // 登录成功
+                    result.put(FIELD_STATUS, STATUS_SUCCESS)
+                          .put(FIELD_USER_ID, userId)
+                          .put(FIELD_USERNAME, username);
+                    sendJson(response, HttpServletResponse.SC_OK, result);
+                }
+            }
+        } catch (NamingException ne) {
+            log("JNDI DataSource lookup failed", ne);
+            result.put(FIELD_STATUS, STATUS_ERROR).put(FIELD_MESSAGE, MSG_SERVER_CONFIG_ERROR);
+            sendJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, result);
+        } catch (SQLException se) {
+            log("DB error", se);
+            result.put(FIELD_STATUS, STATUS_ERROR).put(FIELD_MESSAGE, MSG_DB_ERROR);
+            sendJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, result);
+        } catch (Exception e) {
+            log("Unexpected error", e);
+            result.put(FIELD_STATUS, STATUS_ERROR).put(FIELD_MESSAGE, MSG_SERVER_ERROR);
+            sendJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, result);
+        }
     }
 }
