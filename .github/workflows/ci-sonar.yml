@@ -15,35 +15,27 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up JDK 17
+      - name: Set up JDK 11
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '11'
           cache: maven
 
-      # 预热依赖，降低首次构建失败概率
-      - name: Warm up Maven dependencies
-        run: |
-          mvn -B -U \
-            -Dmaven.wagon.http.retryHandler.count=5 \
-            -Dmaven.wagon.http.pool=false \
-            dependency:go-offline
+      # ❶ 生成 JaCoCo 覆盖率报告 (target/site/jacoco/jacoco.xml)
+      - name: Build & Test (with JaCoCo)
+        run: mvn -B clean verify
 
-      - name: Build & Test
-        run: |
-          mvn -B clean verify \
-            -Dmaven.wagon.http.retryHandler.count=5 \
-            -Dmaven.wagon.http.pool=false
-
-      - name: SonarCloud Scan (Maven)
+      # ❷ Sonar 扫描，并指向 jacoco.xml
+      # ❸ 可选：临时排除前端/Servlet 覆盖率，减少 "Lines to cover" 压力
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@v2
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: |
-          mvn -B sonar:sonar \
-            -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }} \
-            -Dsonar.organization=${{ secrets.SONAR_ORG }} \
-            -Dsonar.host.url=https://sonarcloud.io \
-            -Dsonar.login=${SONAR_TOKEN} \
-            -Dmaven.wagon.http.retryHandler.count=5 \
-            -Dmaven.wagon.http.pool=false
+        with:
+          args: >
+            -Dsonar.projectKey=LinLing1030_StudyLifeAPI
+            -Dsonar.organization=linling1030
+            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+            -Dsonar.coverage.exclusions=src/main/webapp/**,src/main/webapp/js/**,src/main/webapp/css/**,src/main/webapp/**/*.html
