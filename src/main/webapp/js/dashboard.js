@@ -119,21 +119,17 @@ function generateCalendar(year, month) {
 const DEFAULT_COORD = { lat: 53.3498, lng: -6.2603 }; // Dublin fallback
 
 function isSecureContextForGeo() {
-  // HTTPS or localhost is considered secure for geolocation
   const host = location.hostname;
-  const isLocal = (host === "localhost" || host === "127.0.0.1");
+  const isLocal = host === "localhost" || host === "127.0.0.1";
   return location.protocol === "https:" || isLocal;
 }
 
 function initMap() {
   if (!navigator.geolocation) {
-    // No geolocation support
     renderMapAndWeather(DEFAULT_COORD.lat, DEFAULT_COORD.lng, true);
     return;
   }
-
   if (!isSecureContextForGeo()) {
-    // On mobile, geolocation over HTTP is blocked
     renderMapAndWeather(DEFAULT_COORD.lat, DEFAULT_COORD.lng, true);
     return;
   }
@@ -147,18 +143,13 @@ function initMap() {
     function () {
       renderMapAndWeather(DEFAULT_COORD.lat, DEFAULT_COORD.lng, true);
     },
-    {
-      enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 60000
-    }
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
   );
 }
 
 function renderMapAndWeather(lat, lng, isFallback) {
-  var mapEl = document.getElementById("map");
+  const mapEl = document.getElementById("map");
   if (!mapEl || typeof L === "undefined") {
-    // Map container or Leaflet not present; still fetch weather
     getWeather(lat, lng, isFallback);
     return;
   }
@@ -179,9 +170,9 @@ function getWeather(lat, lng, isFallback) {
   fetch("https://nominatim.openstreetmap.org/reverse?format=json&lat=" + lat + "&lon=" + lng)
     .then(function (res) { return res.json(); })
     .then(function (locationData) {
-      var a = (locationData && locationData.address) ? locationData.address : null;
-      var fallbackCity = isFallback ? "Dublin (fallback)" : "Unknown Location";
-      var city = null;
+      const a = locationData && locationData.address ? locationData.address : null;
+      const fallbackCity = isFallback ? "Dublin (fallback)" : "Unknown Location";
+      let city = null;
 
       if (a) {
         if (a.city) city = a.city;
@@ -193,10 +184,9 @@ function getWeather(lat, lng, isFallback) {
         else if (a.state) city = a.state;
         else if (a.country) city = a.country;
       }
-
       if (!city) city = fallbackCity;
 
-      var url =
+      const url =
         "https://api.open-meteo.com/v1/forecast" +
         "?latitude=" + lat +
         "&longitude=" + lng +
@@ -204,22 +194,18 @@ function getWeather(lat, lng, isFallback) {
 
       return fetch(url)
         .then(function (r) { return r.json(); })
-        .then(function (data) {
-          return { city: city, data: data };
-        });
+        .then(function (data) { return { city: city, data: data }; });
     })
     .then(function (payload) {
-      var city = payload.city;
-      var data = payload.data;
+      const city = payload.city;
+      const data = payload.data;
 
-      // 旧语法兼容：data && data.current_weather ? ... : {}
-      var weather = (data && data.current_weather) ? data.current_weather : {};
-
-      var display = document.getElementById("weatherDisplay");
+      const weather = data?.current_weather ?? {};
+      const display = document.getElementById("weatherDisplay");
       if (!display) return;
 
-      var temp = (weather.temperature !== undefined ? weather.temperature : "--") + "°C";
-      var wind = (weather.windspeed !== undefined ? weather.windspeed : "--") + " km/h";
+      const temp = (weather.temperature ?? "--") + "°C";
+      const wind = (weather.windspeed ?? "--") + " km/h";
 
       display.innerHTML =
         "<p><strong>Location:</strong> " + city + "</p>" +
@@ -228,7 +214,7 @@ function getWeather(lat, lng, isFallback) {
     })
     .catch(function (err) {
       console.error("Weather/location fetch error:", err);
-      var el = document.getElementById("weatherDisplay");
+      const el = document.getElementById("weatherDisplay");
       if (el) el.innerText = "Failed to load location or weather data.";
     });
 }
@@ -238,21 +224,17 @@ function getWeather(lat, lng, isFallback) {
 
 function getLocationAndSendToBackend(userId) {
   if (!navigator.geolocation) return;
-  if (!isSecureContextForGeo()) return; // skip silently on non-secure contexts
+  if (!isSecureContextForGeo()) return;
 
   navigator.geolocation.getCurrentPosition(
     function (position) {
-      var lat = position.coords.latitude;
-      var lng = position.coords.longitude;
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
 
       fetch("https://nominatim.openstreetmap.org/reverse?format=json&lat=" + lat + "&lon=" + lng)
         .then(function (response) { return response.json(); })
         .then(function (data) {
-          // 旧语法兼容：安全读取 address.country
-          var country = "Unknown";
-          if (data && data.address && data.address.country) {
-            country = data.address.country;
-          }
+          const country = data?.address?.country ?? "Unknown";
           return fetch("api/save-country", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -263,7 +245,7 @@ function getLocationAndSendToBackend(userId) {
         .then(function (text) { console.log("Country saved:", text); })
         .catch(function (err) { console.error("Error saving country:", err); });
     },
-    function () { /* ignore failures here */ },
+    function () { /* ignore */ },
     { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
   );
 }
@@ -308,11 +290,11 @@ function addWater(amount) {
 }
 
 function addWaterCustom() {
-  var valStr = prompt("Enter amount of water in ml (e.g., 250):", "250");
+  const valStr = prompt("Enter amount of water in ml (e.g., 250):", "250");
   if (valStr === null) return;
 
-  var val = parseInt(valStr, 10);
-  if (!isFinite(val) || val <= 0) {
+  const val = parseInt(valStr, 10);
+  if (!Number.isFinite(val) || val <= 0) {
     alert("Please enter a valid positive number.");
     return;
   }
