@@ -63,7 +63,7 @@ public class SendReminderServlet extends HttpServlet {
 
             scheduler.schedule(() -> {
                 try {
-                    EmailUtil.sendEmail(email, "Reminder Alert", fullMessage);
+                    EmailUtil.sendMail(email, "Reminder Alert", fullMessage);
                 } catch (Exception e) {
                     e.printStackTrace();
                 }

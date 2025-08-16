@@ -1,6 +1,5 @@
 package com.studylife.servlet;
 
-import javax.servlet.*;
 import javax.servlet.http.*;
 import javax.naming.*;
 import javax.sql.DataSource;
@@ -8,6 +7,7 @@ import java.io.*;
 import java.sql.*;
 import java.util.Set;
 
+import org.json.JSONException;
 import org.json.JSONObject;
 import org.mindrot.jbcrypt.BCrypt;
 
@@ -46,19 +46,17 @@ public class RegisterServlet extends HttpServlet {
         if (origin != null && ALLOWED_ORIGINS.contains(origin)) {
             resp.setHeader("Access-Control-Allow-Origin", origin);
             resp.setHeader("Vary", "Origin");
-            // 如需携带 Cookie，解开下一行，并在前端 fetch 开启 credentials
             // resp.setHeader("Access-Control-Allow-Credentials", "true");
         }
         resp.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
         resp.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
         resp.setHeader("Access-Control-Max-Age", "3600");
-        // 安全响应头
         resp.setHeader("X-Content-Type-Options", "nosniff");
         resp.setHeader("Cache-Control", "no-store");
     }
 
     @Override
-    protected void doOptions(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+    protected void doOptions(HttpServletRequest req, HttpServletResponse resp) {
         setCors(req, resp);
         resp.setStatus(HttpServletResponse.SC_NO_CONTENT);
     }
@@ -70,19 +68,33 @@ public class RegisterServlet extends HttpServlet {
         return (DataSource) envCtx.lookup("jdbc/StudyLife");
     }
 
-    /* ===== JSON 输出工具 ===== */
-    private static void sendJson(HttpServletResponse resp, int httpCode, JSONObject json) throws IOException {
+    /* ===== JSON 帮助 ===== */
+    private static void safePut(JSONObject obj, String k, Object v) {
+        try { obj.put(k, v); } catch (JSONException ignore) { /* log if needed */ }
+    }
+
+    private static void sendJson(HttpServletResponse resp, int httpCode, JSONObject json) {
         resp.setStatus(httpCode);
         resp.setContentType(CT_JSON_UTF8);
         try (PrintWriter out = resp.getWriter()) {
             out.write(json.toString());
+        } catch (IOException ioe) {
+            ioe.printStackTrace();
         }
     }
 
     @Override
-    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws IOException {
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) {
         setCors(request, response);
-        request.setCharacterEncoding("UTF-8");
+        try {
+            request.setCharacterEncoding("UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            JSONObject r = new JSONObject();
+            safePut(r, FIELD_STATUS, STATUS_FAIL);
+            safePut(r, FIELD_MESSAGE, MSG_INVALID_BODY);
+            sendJson(response, HttpServletResponse.SC_BAD_REQUEST, r);
+            return;
+        }
         response.setCharacterEncoding("UTF-8");
 
         JSONObject result = new JSONObject();
@@ -95,7 +107,8 @@ public class RegisterServlet extends HttpServlet {
             while ((line = r.readLine()) != null) sb.append(line);
             body = sb.toString();
         } catch (IOException e) {
-            result.put(FIELD_STATUS, STATUS_FAIL).put(FIELD_MESSAGE, MSG_INVALID_BODY);
+            safePut(result, FIELD_STATUS, STATUS_FAIL);
+            safePut(result, FIELD_MESSAGE, MSG_INVALID_BODY);
             sendJson(response, HttpServletResponse.SC_BAD_REQUEST, result);
             return;
         }
@@ -108,24 +121,25 @@ public class RegisterServlet extends HttpServlet {
             username = json.optString(FIELD_USERNAME, "").trim();
             password = json.optString(FIELD_PASSWORD, "");
         } catch (Exception e) {
-            result.put(FIELD_STATUS, STATUS_FAIL).put(FIELD_MESSAGE, MSG_INVALID_JSON);
+            safePut(result, FIELD_STATUS, STATUS_FAIL);
+            safePut(result, FIELD_MESSAGE, MSG_INVALID_JSON);
             sendJson(response, HttpServletResponse.SC_BAD_REQUEST, result);
             return;
         }
 
-        // 基础校验：避免空值/超长
+        // 基础校验
         if (username.isEmpty() || password.isEmpty()
                 || username.length() < 3 || username.length() > 64
                 || password.length() < 6 || password.length() > 128) {
-            result.put(FIELD_STATUS, STATUS_FAIL).put(FIELD_MESSAGE, MSG_INVALID_INPUT);
+            safePut(result, FIELD_STATUS, STATUS_FAIL);
+            safePut(result, FIELD_MESSAGE, MSG_INVALID_INPUT);
             sendJson(response, HttpServletResponse.SC_OK, result);
             return;
         }
 
-        // 业务：检查重名 & 写入哈希
+        // 检查重名 & 写入哈希
         try {
             DataSource ds = getDataSource();
-
             try (Connection conn = ds.getConnection()) {
 
                 // 先检查是否已存在
@@ -134,17 +148,18 @@ public class RegisterServlet extends HttpServlet {
                     ps.setString(1, username);
                     try (ResultSet rs = ps.executeQuery()) {
                         if (rs.next()) {
-                            result.put(FIELD_STATUS, STATUS_FAIL).put(FIELD_MESSAGE, MSG_USERNAME_EXISTS);
+                            safePut(result, FIELD_STATUS, STATUS_FAIL);
+                            safePut(result, FIELD_MESSAGE, MSG_USERNAME_EXISTS);
                             sendJson(response, HttpServletResponse.SC_OK, result);
                             return;
                         }
                     }
                 }
 
-                // 计算密码哈希（明文严禁入库）
+                // 计算密码哈希
                 final String hash = BCrypt.hashpw(password, BCrypt.gensalt(12));
 
-                // 插入（假设列名为 password_hash；如你的表是 password，请改成 password）
+                // 插入（列名 password_hash，如不同请按你的表修改）
                 final String insertSql = "INSERT INTO users (username, password_hash) VALUES (?, ?)";
                 try (PreparedStatement ps = conn.prepareStatement(insertSql)) {
                     ps.setString(1, username);
@@ -152,25 +167,28 @@ public class RegisterServlet extends HttpServlet {
                     ps.executeUpdate();
                 }
 
-                result.put(FIELD_STATUS, STATUS_SUCCESS);
+                safePut(result, FIELD_STATUS, STATUS_SUCCESS);
                 sendJson(response, HttpServletResponse.SC_OK, result);
             }
 
         } catch (SQLIntegrityConstraintViolationException dup) {
-            // 唯一约束冲突（双保险）
-            result.put(FIELD_STATUS, STATUS_FAIL).put(FIELD_MESSAGE, MSG_USERNAME_EXISTS);
+            safePut(result, FIELD_STATUS, STATUS_FAIL);
+            safePut(result, FIELD_MESSAGE, MSG_USERNAME_EXISTS);
             sendJson(response, HttpServletResponse.SC_OK, result);
         } catch (NamingException ne) {
             log("JNDI DataSource lookup failed", ne);
-            result.put(FIELD_STATUS, STATUS_ERROR).put(FIELD_MESSAGE, MSG_SERVER_CONFIG_ERROR);
+            safePut(result, FIELD_STATUS, STATUS_ERROR);
+            safePut(result, FIELD_MESSAGE, MSG_SERVER_CONFIG_ERROR);
             sendJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, result);
         } catch (SQLException se) {
             log("DB error", se);
-            result.put(FIELD_STATUS, STATUS_ERROR).put(FIELD_MESSAGE, MSG_DB_ERROR);
+            safePut(result, FIELD_STATUS, STATUS_ERROR);
+            safePut(result, FIELD_MESSAGE, MSG_DB_ERROR);
             sendJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, result);
         } catch (Exception e) {
             log("Unexpected error", e);
-            result.put(FIELD_STATUS, STATUS_ERROR).put(FIELD_MESSAGE, MSG_SERVER_ERROR);
+            safePut(result, FIELD_STATUS, STATUS_ERROR);
+            safePut(result, FIELD_MESSAGE, MSG_SERVER_ERROR);
             sendJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, result);
         }
     }
