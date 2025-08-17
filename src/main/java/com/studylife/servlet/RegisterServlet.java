@@ -16,7 +16,6 @@ import java.util.Set;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.mindrot.jbcrypt.BCrypt;
-
 public class RegisterServlet extends HttpServlet {
 
     /* ===== 常量：字段 / 消息文本 ===== */

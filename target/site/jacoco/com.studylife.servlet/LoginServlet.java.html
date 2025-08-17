@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LoginServlet.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">StudyLifeAPI</a> &gt; <a href="index.source.html" class="el_package">com.studylife.servlet</a> &gt; <span class="el_source">LoginServlet.java</span></div><h1>LoginServlet.java</h1><pre class="source lang-java linenums">package com.studylife.servlet;
+
+import javax.naming.Context;
+import javax.naming.InitialContext;
+import javax.naming.NamingException;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.sql.DataSource;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.UnsupportedEncodingException;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.Set;
+import org.json.JSONException;
+import org.json.JSONObject;
+import org.mindrot.jbcrypt.BCrypt;
+
+
+<span class="fc" id="L24">public class LoginServlet extends HttpServlet {</span>
+
+    /* ===== 常量：字段名 / 文本 ===== */
+    private static final String FIELD_STATUS   = &quot;status&quot;;
+    private static final String FIELD_MESSAGE  = &quot;message&quot;;
+    private static final String FIELD_USER_ID  = &quot;userId&quot;;
+    private static final String FIELD_USERNAME = &quot;username&quot;;
+
+    private static final String STATUS_SUCCESS = &quot;success&quot;;
+    private static final String STATUS_FAIL    = &quot;fail&quot;;
+    private static final String STATUS_ERROR   = &quot;error&quot;;
+
+    private static final String MSG_INVALID_JSON        = &quot;Invalid JSON&quot;;
+    private static final String MSG_INVALID_BODY        = &quot;Invalid request body&quot;;
+    private static final String MSG_INVALID_CREDENTIALS = &quot;Invalid credentials&quot;;
+    private static final String MSG_SERVER_CONFIG_ERROR = &quot;Server config error&quot;;
+    private static final String MSG_DB_ERROR            = &quot;Database error&quot;;
+    private static final String MSG_SERVER_ERROR        = &quot;Server error&quot;;
+
+    private static final String CT_JSON_UTF8 = &quot;application/json;charset=UTF-8&quot;;
+
+    // 允许来源
+<span class="fc" id="L46">    private static final Set&lt;String&gt; ALLOWED_ORIGINS = Set.of(</span>
+        &quot;http://localhost:3000&quot;,
+        &quot;http://localhost:5500&quot;,
+        &quot;https://studylife.example&quot;
+    );
+
+    /* ===== 工具：安全 put 与统一输出 ===== */
+    private static void safePut(JSONObject obj, String k, Object v) {
+<span class="pc" id="L54">        try { obj.put(k, v); } catch (JSONException ignored) { /* never mind */ }</span>
+<span class="fc" id="L55">    }</span>
+
+    private static void sendJson(HttpServletResponse resp, int httpCode, JSONObject json) {
+<span class="fc" id="L58">        resp.setStatus(httpCode);</span>
+<span class="fc" id="L59">        resp.setContentType(CT_JSON_UTF8);</span>
+<span class="fc" id="L60">        try (PrintWriter out = resp.getWriter()) {</span>
+<span class="fc" id="L61">            out.write(json.toString());</span>
+<span class="pc" id="L62">        } catch (IOException ignored) { /* 响应流已关闭或网络中断，不再额外处理 */ }</span>
+<span class="fc" id="L63">    }</span>
+
+    /* ===== CORS ===== */
+    private void setCors(HttpServletRequest req, HttpServletResponse resp) {
+<span class="fc" id="L67">        String origin = req.getHeader(&quot;Origin&quot;);</span>
+<span class="pc bpc" id="L68" title="3 of 4 branches missed.">        if (origin != null &amp;&amp; ALLOWED_ORIGINS.contains(origin)) {</span>
+<span class="nc" id="L69">            resp.setHeader(&quot;Access-Control-Allow-Origin&quot;, origin);</span>
+<span class="nc" id="L70">            resp.setHeader(&quot;Vary&quot;, &quot;Origin&quot;);</span>
+        }
+<span class="fc" id="L72">        resp.setHeader(&quot;Access-Control-Allow-Methods&quot;, &quot;POST, OPTIONS&quot;);</span>
+<span class="fc" id="L73">        resp.setHeader(&quot;Access-Control-Allow-Headers&quot;, &quot;Content-Type, Authorization&quot;);</span>
+<span class="fc" id="L74">        resp.setHeader(&quot;Access-Control-Max-Age&quot;, &quot;3600&quot;);</span>
+<span class="fc" id="L75">        resp.setHeader(&quot;X-Content-Type-Options&quot;, &quot;nosniff&quot;);</span>
+<span class="fc" id="L76">        resp.setHeader(&quot;Cache-Control&quot;, &quot;no-store&quot;);</span>
+<span class="fc" id="L77">    }</span>
+
+    @Override
+    protected void doOptions(HttpServletRequest req, HttpServletResponse resp) {
+<span class="nc" id="L81">        setCors(req, resp);</span>
+<span class="nc" id="L82">        resp.setStatus(HttpServletResponse.SC_NO_CONTENT);</span>
+<span class="nc" id="L83">    }</span>
+
+    /* ===== JNDI DataSource ===== */
+    private DataSource getDataSource() throws NamingException {
+<span class="nc" id="L87">        Context initCtx = new InitialContext();</span>
+<span class="nc" id="L88">        Context envCtx  = (Context) initCtx.lookup(&quot;java:/comp/env&quot;);</span>
+<span class="nc" id="L89">        return (DataSource) envCtx.lookup(&quot;jdbc/StudyLife&quot;);</span>
+    }
+
+    @Override
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) {
+<span class="fc" id="L94">        setCors(request, response);</span>
+        try {
+<span class="fc" id="L96">            request.setCharacterEncoding(&quot;UTF-8&quot;);</span>
+<span class="nc" id="L97">        } catch (UnsupportedEncodingException e) {</span>
+<span class="nc" id="L98">            JSONObject err = new JSONObject();</span>
+<span class="nc" id="L99">            safePut(err, FIELD_STATUS, STATUS_FAIL);</span>
+<span class="nc" id="L100">            safePut(err, FIELD_MESSAGE, MSG_INVALID_BODY);</span>
+<span class="nc" id="L101">            sendJson(response, HttpServletResponse.SC_BAD_REQUEST, err);</span>
+<span class="nc" id="L102">            return;</span>
+<span class="fc" id="L103">        }</span>
+
+<span class="fc" id="L105">        JSONObject result = new JSONObject();</span>
+
+        // 读取 JSON
+        String body;
+<span class="fc" id="L109">        try (BufferedReader r = request.getReader()) {</span>
+<span class="fc" id="L110">            StringBuilder sb = new StringBuilder(256);</span>
+            String line;
+<span class="fc bfc" id="L112" title="All 2 branches covered.">            while ((line = r.readLine()) != null) sb.append(line);</span>
+<span class="fc" id="L113">            body = sb.toString();</span>
+<span class="nc" id="L114">        } catch (IOException e) {</span>
+<span class="nc" id="L115">            safePut(result, FIELD_STATUS, STATUS_FAIL);</span>
+<span class="nc" id="L116">            safePut(result, FIELD_MESSAGE, MSG_INVALID_BODY);</span>
+<span class="nc" id="L117">            sendJson(response, HttpServletResponse.SC_BAD_REQUEST, result);</span>
+<span class="nc" id="L118">            return;</span>
+<span class="fc" id="L119">        }</span>
+
+        String username, password;
+        try {
+<span class="nc" id="L123">            JSONObject json = new JSONObject(body);</span>
+<span class="nc" id="L124">            username = json.optString(FIELD_USERNAME, &quot;&quot;).trim();</span>
+<span class="nc" id="L125">            password = json.optString(&quot;password&quot;, &quot;&quot;);</span>
+<span class="fc" id="L126">        } catch (Exception ex) {</span>
+<span class="fc" id="L127">            safePut(result, FIELD_STATUS, STATUS_FAIL);</span>
+<span class="fc" id="L128">            safePut(result, FIELD_MESSAGE, MSG_INVALID_JSON);</span>
+<span class="fc" id="L129">            sendJson(response, HttpServletResponse.SC_BAD_REQUEST, result);</span>
+<span class="fc" id="L130">            return;</span>
+<span class="nc" id="L131">        }</span>
+
+        // 基础校验
+<span class="nc bnc" id="L134" title="All 4 branches missed.">        if (username.isEmpty() || password.isEmpty()</span>
+<span class="nc bnc" id="L135" title="All 4 branches missed.">                || username.length() &lt; 3 || username.length() &gt; 64</span>
+<span class="nc bnc" id="L136" title="All 4 branches missed.">                || password.length() &lt; 6 || password.length() &gt; 128) {</span>
+<span class="nc" id="L137">            safePut(result, FIELD_STATUS, STATUS_FAIL);</span>
+<span class="nc" id="L138">            safePut(result, FIELD_MESSAGE, MSG_INVALID_CREDENTIALS);</span>
+<span class="nc" id="L139">            sendJson(response, HttpServletResponse.SC_OK, result);</span>
+<span class="nc" id="L140">            return;</span>
+        }
+
+        try {
+<span class="nc" id="L144">            DataSource ds = getDataSource();</span>
+
+<span class="nc" id="L146">            final String sql = &quot;SELECT id, password_hash FROM users WHERE username = ?&quot;;</span>
+<span class="nc" id="L147">            try (Connection conn = ds.getConnection();</span>
+<span class="nc" id="L148">                 PreparedStatement ps = conn.prepareStatement(sql)) {</span>
+
+<span class="nc" id="L150">                ps.setString(1, username);</span>
+<span class="nc" id="L151">                try (ResultSet rs = ps.executeQuery()) {</span>
+<span class="nc bnc" id="L152" title="All 2 branches missed.">                    if (!rs.next()) {</span>
+<span class="nc" id="L153">                        safePut(result, FIELD_STATUS, STATUS_FAIL);</span>
+<span class="nc" id="L154">                        safePut(result, FIELD_MESSAGE, MSG_INVALID_CREDENTIALS);</span>
+<span class="nc" id="L155">                        sendJson(response, HttpServletResponse.SC_OK, result);</span>
+<span class="nc" id="L156">                        return;</span>
+                    }
+
+<span class="nc" id="L159">                    long userId = rs.getLong(&quot;id&quot;);</span>
+<span class="nc" id="L160">                    String hash = rs.getString(&quot;password_hash&quot;);</span>
+
+<span class="nc bnc" id="L162" title="All 6 branches missed.">                    boolean ok = (hash != null &amp;&amp; !hash.isEmpty()) &amp;&amp; BCrypt.checkpw(password, hash);</span>
+<span class="nc bnc" id="L163" title="All 2 branches missed.">                    if (!ok) {</span>
+<span class="nc" id="L164">                        safePut(result, FIELD_STATUS, STATUS_FAIL);</span>
+<span class="nc" id="L165">                        safePut(result, FIELD_MESSAGE, MSG_INVALID_CREDENTIALS);</span>
+<span class="nc" id="L166">                        sendJson(response, HttpServletResponse.SC_OK, result);</span>
+<span class="nc" id="L167">                        return;</span>
+                    }
+
+<span class="nc" id="L170">                    safePut(result, FIELD_STATUS, STATUS_SUCCESS);</span>
+<span class="nc" id="L171">                    safePut(result, FIELD_USER_ID, userId);</span>
+<span class="nc" id="L172">                    safePut(result, FIELD_USERNAME, username);</span>
+<span class="nc" id="L173">                    sendJson(response, HttpServletResponse.SC_OK, result);</span>
+<span class="nc bnc" id="L174" title="All 4 branches missed.">                }</span>
+<span class="nc bnc" id="L175" title="All 8 branches missed.">            }</span>
+<span class="nc" id="L176">        } catch (NamingException ne) {</span>
+<span class="nc" id="L177">            log(&quot;JNDI DataSource lookup failed&quot;, ne);</span>
+<span class="nc" id="L178">            safePut(result, FIELD_STATUS, STATUS_ERROR);</span>
+<span class="nc" id="L179">            safePut(result, FIELD_MESSAGE, MSG_SERVER_CONFIG_ERROR);</span>
+<span class="nc" id="L180">            sendJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, result);</span>
+<span class="nc" id="L181">        } catch (SQLException se) {</span>
+<span class="nc" id="L182">            log(&quot;DB error&quot;, se);</span>
+<span class="nc" id="L183">            safePut(result, FIELD_STATUS, STATUS_ERROR);</span>
+<span class="nc" id="L184">            safePut(result, FIELD_MESSAGE, MSG_DB_ERROR);</span>
+<span class="nc" id="L185">            sendJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, result);</span>
+<span class="nc" id="L186">        } catch (Exception e) {</span>
+<span class="nc" id="L187">            log(&quot;Unexpected error&quot;, e);</span>
+<span class="nc" id="L188">            safePut(result, FIELD_STATUS, STATUS_ERROR);</span>
+<span class="nc" id="L189">            safePut(result, FIELD_MESSAGE, MSG_SERVER_ERROR);</span>
+<span class="nc" id="L190">            sendJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, result);</span>
+<span class="nc" id="L191">        }</span>
+<span class="nc" id="L192">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

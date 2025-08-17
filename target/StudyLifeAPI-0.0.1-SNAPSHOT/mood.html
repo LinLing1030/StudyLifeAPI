@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mood Tracker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap" />
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(to right, #3db1ff, #00bfff);
+      color: #333;
+    }
+
+    .container {
+      background: white;
+      max-width: 900px;
+      margin: 30px auto;
+      padding: 30px;
+      border-radius: 15px;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+    }
+
+    h1 {
+      font-size: 32px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    h1 img {
+      width: 32px;
+      height: 32px;
+    }
+
+    .section-title {
+      font-size: 24px;
+      margin-bottom: 15px;
+    }
+
+    .input-row {
+      margin: 15px 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    select, input[type="text"] {
+      padding: 10px;
+      font-size: 16px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      flex: 1;
+      min-width: 200px;
+    }
+
+    button {
+      padding: 10px 16px;
+      font-size: 16px;
+      border-radius: 8px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
+    .back-btn {
+      display: inline-block;
+      background-color: #fff;
+      border: 1px solid #007bff;
+      color: #007bff;
+      border-radius: 6px;
+      padding: 10px 16px;
+      text-decoration: none;
+      font-size: 14px;
+      margin-top: 30px;
+    }
+
+    .back-btn:hover {
+      background-color: #007bff;
+      color: white;
+    }
+
+    #calendar {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 5px;
+      padding: 20px;
+      background: #ffffff;
+      border-radius: 15px;
+      max-width: 900px;
+      margin: 20px auto;
+    }
+
+    .calendar-weekday {
+      font-weight: bold;
+      text-align: center;
+      padding: 10px 0;
+      background-color: #e0f0ff;
+      border-radius: 8px;
+    }
+
+    .calendar-day {
+      text-align: center;
+      padding: 12px 0;
+      cursor: pointer;
+      border-radius: 8px;
+      transition: background-color 0.2s;
+      background-color: #f0f8ff;
+    }
+
+    .calendar-day:hover {
+      background-color: #cce6ff;
+    }
+
+    .selected-date {
+      border: 2px solid red;
+      font-weight: bold;
+    }
+
+    #todayMoodDisplay {
+      margin-top: 20px;
+      font-size: 16px;
+      background-color: #f8f8f8;
+      padding: 12px;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+
+<div id="calendar">
+  <div class="calendar-weekday">Sun</div>
+  <div class="calendar-weekday">Mon</div>
+  <div class="calendar-weekday">Tue</div>
+  <div class="calendar-weekday">Wed</div>
+  <div class="calendar-weekday">Thu</div>
+  <div class="calendar-weekday">Fri</div>
+  <div class="calendar-weekday">Sat</div>
+</div>
+
+<div class="container">
+  <h1>😊 Mood Tracker</h1>
+
+  <div class="input-row">
+    <label for="moodSelect">Mood:</label>
+    <select id="moodSelect">
+      <option value="😊">Happy</option>
+      <option value="😐">Neutral</option>
+      <option value="😢">Sad</option>
+      <option value="😠">Angry</option>
+      <option value="😴">Tired</option>
+    </select>
+  </div>
+
+  <div class="input-row">
+    <input type="text" id="moodNote" placeholder="What happened today?">
+    <button onclick="saveMood()">Save Mood</button>
+  </div>
+
+  <div id="todayMoodDisplay">No mood recorded for today.</div>
+
+  <a href="dashboard.html" class="back-btn">← Back to Dashboard</a>
+</div>
+
+<script>
+  let selectedDate = getTodayString();
+  let moods = JSON.parse(localStorage.getItem("moods") || "{}");
+
+  function getTodayString() {
+    const now = new Date();
+    return `${now.getFullYear()}-${(now.getMonth()+1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}`;
+  }
+
+  function generateCalendar() {
+    const calendar = document.getElementById("calendar");
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = today.getMonth();
+    const firstDay = new Date(year, month, 1).getDay();
+    const totalDays = new Date(year, month + 1, 0).getDate();
+
+    for (let i = 0; i < firstDay; i++) {
+      const empty = document.createElement("div");
+      calendar.appendChild(empty);
+    }
+
+    for (let day = 1; day <= totalDays; day++) {
+      const dateElem = document.createElement("div");
+      dateElem.textContent = day;
+      dateElem.classList.add("calendar-day");
+
+      const formatted = `${year}-${(month+1).toString().padStart(2,'0')}-${day.toString().padStart(2,'0')}`;
+      if (formatted === selectedDate) {
+        dateElem.classList.add("selected-date");
+      }
+
+      dateElem.addEventListener("click", function () {
+        selectedDate = formatted;
+        document.querySelectorAll(".calendar-day").forEach(div => div.classList.remove("selected-date"));
+        dateElem.classList.add("selected-date");
+        displayTodayMood();
+      });
+
+      calendar.appendChild(dateElem);
+    }
+  }
+
+  function saveMood() {
+    const moodSelect = document.getElementById("moodSelect");
+    const noteInput = document.getElementById("moodNote");
+
+    const mood = moodSelect.value;
+    const note = noteInput.value.trim();
+
+    moods[selectedDate] = { mood, note };
+    localStorage.setItem("moods", JSON.stringify(moods));
+
+    displayTodayMood();
+    noteInput.value = "";
+    moodSelect.selectedIndex = 0;
+  }
+
+  function displayTodayMood() {
+    const moodDisplay = document.getElementById("todayMoodDisplay");
+    const todayMood = moods[selectedDate];
+
+    if (todayMood) {
+      moodDisplay.innerHTML = `<strong>Selected Date:</strong> ${selectedDate}<br><strong>Mood:</strong> ${todayMood.mood}<br><strong>Note:</strong> ${todayMood.note}`;
+    } else {
+      moodDisplay.textContent = "No mood recorded for today.";
+    }
+  }
+
+  window.onload = function () {
+    generateCalendar();
+    displayTodayMood();
+  };
+</script>
+</body>
+</html>
