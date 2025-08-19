@@ -15,6 +15,8 @@
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+    <!-- Compile to Java 11 bytecode so it runs on your server (JRE 11) -->
     <java.version>11</java.version>
 
     <junit.version>4.13.2</junit.version>
@@ -26,7 +28,7 @@
   </properties>
 
   <dependencies>
-    <!-- Servlet API (由容器提供) -->
+    <!-- Servlet API is provided by the container (Tomcat) -->
     <dependency>
       <groupId>javax.servlet</groupId>
       <artifactId>javax.servlet-api</artifactId>
@@ -34,7 +36,7 @@
       <scope>provided</scope>
     </dependency>
 
-    <!-- MySQL JDBC（打包进 WAR，避免找不到驱动） -->
+    <!-- MySQL JDBC driver is packaged into the WAR -->
     <dependency>
       <groupId>com.mysql</groupId>
       <artifactId>mysql-connector-j</artifactId>
@@ -69,7 +71,7 @@
       <version>1.2.0</version>
     </dependency>
 
-    <!-- 测试依赖 -->
+    <!-- Test dependencies -->
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
@@ -100,21 +102,26 @@
   </dependencies>
 
   <build>
-    <!-- 固定生成 StudyLifeAPI.war -->
+    <!-- Fix WAR file name to StudyLifeAPI.war -->
     <finalName>StudyLifeAPI</finalName>
 
     <plugins>
-      <!-- Java 11 编译 -->
+      <!-- Compile with Java 11 bytecode -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
         <version>3.11.0</version>
         <configuration>
+          <!-- Using 'release' ensures both source/target and stdlib matching -->
           <release>${java.version}</release>
+          <!-- (Optional fallback) Uncomment if you ever need explicit flags:
+          <source>${java.version}</source>
+          <target>${java.version}</target>
+          -->
         </configuration>
       </plugin>
 
-      <!-- WAR 插件 -->
+      <!-- WAR packaging -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-war-plugin</artifactId>
@@ -125,14 +132,14 @@
         </configuration>
       </plugin>
 
-      <!-- JUnit4 -->
+      <!-- JUnit 4 runner -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <version>${surefire.version}</version>
       </plugin>
 
-      <!-- JaCoCo -->
+      <!-- JaCoCo coverage -->
       <plugin>
         <groupId>org.jacoco</groupId>
         <artifactId>jacoco-maven-plugin</artifactId>
@@ -140,24 +147,29 @@
         <executions>
           <execution>
             <id>prepare-agent</id>
-            <goals><goal>prepare-agent</goal></goals>
+            <goals>
+              <goal>prepare-agent</goal>
+            </goals>
           </execution>
           <execution>
             <id>report</id>
             <phase>verify</phase>
-            <goals><goal>report</goal></goals>
+            <goals>
+              <goal>report</goal>
+            </goals>
           </execution>
         </executions>
       </plugin>
 
-      <!-- Sonar -->
+      <!-- Sonar Scanner for Maven (used in CI) -->
       <plugin>
         <groupId>org.sonarsource.scanner.maven</groupId>
         <artifactId>sonar-maven-plugin</artifactId>
         <version>3.9.1.2184</version>
       </plugin>
 
-      <!-- Enforcer：限制 Java 版本为 11 -->
+      <!-- Enforcer: allow building with JDK 11..17 (CI uses 17),
+           but our bytecode stays at Java 11 -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-enforcer-plugin</artifactId>
@@ -165,11 +177,14 @@
         <executions>
           <execution>
             <id>enforce-java</id>
-            <goals><goal>enforce</goal></goals>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
             <configuration>
               <rules>
                 <requireJavaVersion>
-                  <version>[11,12)</version>
+                  <!-- Allow running Maven with JDK 11 up to (but not including) 18 -->
+                  <version>[11,18)</version>
                 </requireJavaVersion>
               </rules>
               <fail>true</fail>
