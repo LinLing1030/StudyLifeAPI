@@ -1,6 +1,7 @@
 package com.studylife.servlet;
 
 import org.json.JSONObject;
+import org.json.JSONException;
 
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -40,18 +41,30 @@ public class LoginServlet extends HttpServlet {
         }
 
         JSONObject result = new JSONObject();
+
+        JSONObject json;
         try {
-            JSONObject json = new JSONObject(body);
+            // ✅ 这里单独处理无效 JSON
+            json = new JSONObject(body);
+        } catch (JSONException ex) {
+            response.setStatus(HttpServletResponse.SC_BAD_REQUEST); // 400
+            result.put("status", "fail").put("message", "Invalid JSON");
+            response.getWriter().write(result.toString());
+            return;
+        }
+
+        try {
             String username = json.optString("username", "").trim();
             String password = json.optString("password", "").trim();
 
             if (username.isEmpty() || password.isEmpty()) {
+                response.setStatus(HttpServletResponse.SC_BAD_REQUEST); // 建议返回 400
                 result.put("status", "fail").put("message", "Username or password empty.");
                 response.getWriter().write(result.toString());
                 return;
             }
 
-            // 加载驱动（新版本通常可省略，但保留兼容）
+            // 加载驱动
             Class.forName("com.mysql.cj.jdbc.Driver");
 
             String url = "jdbc:mysql://127.0.0.1:3306/studylife_db"
@@ -61,7 +74,6 @@ public class LoginServlet extends HttpServlet {
 
             String sql = "SELECT id FROM users WHERE username = ? AND password = ?";
 
-            // try-with-resources 自动关闭
             try (Connection conn = DriverManager.getConnection(url, dbUser, dbPass);
                  PreparedStatement ps = conn.prepareStatement(sql)) {
 
@@ -79,6 +91,7 @@ public class LoginServlet extends HttpServlet {
             }
         } catch (Exception e) {
             e.printStackTrace();
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR); // 500
             result.put("status", "error").put("message", e.getMessage());
         }
 
