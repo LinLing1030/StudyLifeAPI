@@ -1,8 +1,0 @@
-GROUP,PACKAGE,CLASS,INSTRUCTION_MISSED,INSTRUCTION_COVERED,BRANCH_MISSED,BRANCH_COVERED,LINE_MISSED,LINE_COVERED,COMPLEXITY_MISSED,COMPLEXITY_COVERED,METHOD_MISSED,METHOD_COVERED
-StudyLifeAPI,com.studylife.servlet,EmailUtil.new Authenticator() {...},17,0,0,0,2,0,2,0,2,0
-StudyLifeAPI,com.studylife.servlet,EmailUtil.new Authenticator() {...},17,0,0,0,2,0,2,0,2,0
-StudyLifeAPI,com.studylife.servlet,EmailUtil,15,185,2,2,3,43,3,3,1,3
-StudyLifeAPI,com.studylife.servlet,SaveCountryServlet,106,0,2,0,30,0,4,0,3,0
-StudyLifeAPI,com.studylife.servlet,SendReminderServlet,49,122,2,4,13,33,3,4,1,3
-StudyLifeAPI,com.studylife.servlet,LoginServlet,287,106,37,3,72,32,21,7,2,6
-StudyLifeAPI,com.studylife.servlet,RegisterServlet,218,154,17,9,63,42,13,8,1,7

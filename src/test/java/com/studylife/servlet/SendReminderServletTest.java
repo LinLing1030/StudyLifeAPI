@@ -11,9 +11,6 @@ import static org.junit.Assert.*;
 
 public class SendReminderServletTest {
 
-    /**
-     * 坏 JSON：只要出现 4xx/5xx 或正文里含 error/invalid 就认为进入了错误分支
-     */
     @Test
     public void invalidJson_4xx_or_5xx() throws Exception {
         // 传入非法 JSON 字符串
@@ -34,9 +31,7 @@ public class SendReminderServletTest {
         );
     }
 
-    /**
-     * 过去时间：应返回 4xx，并包含“Selected time”/“already”/“MSG_INVALID_TIME”或错误字样
-     */
+
     @Test
     public void pastTime_shouldFail_400_like() throws Exception {
         JSONObject body = new JSONObject()

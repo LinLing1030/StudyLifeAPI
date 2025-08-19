@@ -14,12 +14,13 @@
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <java.version>17</java.version>
+    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    <java.version>11</java.version>
 
     <junit.version>4.13.2</junit.version>
     <mockito.version>5.12.0</mockito.version>
     <h2.version>2.2.224</h2.version>
-    <greenmail.version>1.6.11</greenmail.version> <!-- javax.mail 版 -->
+    <greenmail.version>1.6.11</greenmail.version>
     <jacoco.version>0.8.12</jacoco.version>
     <surefire.version>3.2.5</surefire.version>
   </properties>
@@ -33,7 +34,7 @@
       <scope>provided</scope>
     </dependency>
 
-    <!-- MySQL JDBC -->
+    <!-- MySQL JDBC（打包进 WAR，避免找不到驱动） -->
     <dependency>
       <groupId>com.mysql</groupId>
       <artifactId>mysql-connector-j</artifactId>
@@ -47,28 +48,28 @@
       <version>20240303</version>
     </dependency>
 
-    <!-- BCrypt（主代码使用，不能 test-scope） -->
+    <!-- BCrypt -->
     <dependency>
       <groupId>org.mindrot</groupId>
       <artifactId>jbcrypt</artifactId>
       <version>0.4</version>
     </dependency>
 
-    <!-- JavaMail (javax.mail) -->
+    <!-- JavaMail -->
     <dependency>
       <groupId>com.sun.mail</groupId>
       <artifactId>javax.mail</artifactId>
       <version>1.6.2</version>
     </dependency>
 
-    <!-- Activation (javax.activation) -->
+    <!-- Activation -->
     <dependency>
       <groupId>com.sun.activation</groupId>
       <artifactId>javax.activation</artifactId>
       <version>1.2.0</version>
     </dependency>
 
-
+    <!-- 测试依赖 -->
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
@@ -90,7 +91,6 @@
       <scope>test</scope>
     </dependency>
 
-    <!-- 使用 javax.mail 的 GreenMail 版本，避免 jakarta 冲突 -->
     <dependency>
       <groupId>com.icegreen</groupId>
       <artifactId>greenmail</artifactId>
@@ -100,9 +100,13 @@
   </dependencies>
 
   <build>
+    <!-- 固定生成 StudyLifeAPI.war -->
+    <finalName>StudyLifeAPI</finalName>
+
     <plugins>
-      <!-- Java 17 编译 -->
+      <!-- Java 11 编译 -->
       <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
         <version>3.11.0</version>
         <configuration>
@@ -110,18 +114,25 @@
         </configuration>
       </plugin>
 
+      <!-- WAR 插件 -->
       <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-war-plugin</artifactId>
         <version>3.4.0</version>
+        <configuration>
+          <warSourceDirectory>src/main/webapp</warSourceDirectory>
+          <failOnMissingWebXml>false</failOnMissingWebXml>
+        </configuration>
       </plugin>
 
-      <!-- JUnit4 运行器 -->
+      <!-- JUnit4 -->
       <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <version>${surefire.version}</version>
       </plugin>
 
-      <!-- JaCoCo 覆盖率 -->
+      <!-- JaCoCo -->
       <plugin>
         <groupId>org.jacoco</groupId>
         <artifactId>jacoco-maven-plugin</artifactId>
@@ -129,28 +140,24 @@
         <executions>
           <execution>
             <id>prepare-agent</id>
-            <goals>
-              <goal>prepare-agent</goal>
-            </goals>
+            <goals><goal>prepare-agent</goal></goals>
           </execution>
           <execution>
             <id>report</id>
             <phase>verify</phase>
-            <goals>
-              <goal>report</goal>
-            </goals>
+            <goals><goal>report</goal></goals>
           </execution>
         </executions>
       </plugin>
 
-      <!-- Sonar（可留可去） -->
+      <!-- Sonar -->
       <plugin>
         <groupId>org.sonarsource.scanner.maven</groupId>
         <artifactId>sonar-maven-plugin</artifactId>
         <version>3.9.1.2184</version>
       </plugin>
 
-      <!-- （可选）强制使用 Java 17，防止用到本机 JDK 23 之类 -->
+      <!-- Enforcer：限制 Java 版本为 11 -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-enforcer-plugin</artifactId>
@@ -162,7 +169,7 @@
             <configuration>
               <rules>
                 <requireJavaVersion>
-                  <version>[17,18)</version>
+                  <version>[11,12)</version>
                 </requireJavaVersion>
               </rules>
               <fail>true</fail>

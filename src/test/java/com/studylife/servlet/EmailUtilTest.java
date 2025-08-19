@@ -11,23 +11,18 @@ import javax.mail.internet.MimeMessage;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-/**
- * EmailUtil 的集成测试：使用本地 GreenMail SMTP (localhost:3025)。
- * 依赖：
- *   - com.icegreen:greenmail:1.6.10 (test)
- *   - com.sun.mail:javax.mail:1.6.2
- */
+
 public class EmailUtilTest {
 
     private GreenMail smtp;
 
     @Before
     public void startSmtp() {
-        // 启动一个本地 SMTP (端口 3025)，不会访问外网
+        
         smtp = new GreenMail(ServerSetupTest.SMTP);
         smtp.start();
 
-        // 配置 EmailUtil 读取到的系统属性 —— 禁用鉴权/加密，全部走本地
+        
         System.setProperty("MAIL_USERNAME",  "noreply@test.local");
         System.setProperty("MAIL_PASSWORD",  "dummy");
         System.setProperty("MAIL_FROM",      "noreply@test.local");
@@ -44,7 +39,7 @@ public class EmailUtilTest {
         if (smtp != null) {
             smtp.stop();
         }
-        // 清理系统属性，避免影响其他用例
+        
         System.clearProperty("MAIL_USERNAME");
         System.clearProperty("MAIL_PASSWORD");
         System.clearProperty("MAIL_FROM");

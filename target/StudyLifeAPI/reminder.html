@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Reminder</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(to right, #3db1ff, #00bfff);
+      color: #333;
+    }
+
+    #calendar {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 5px;
+      padding: 20px;
+      background: #ffffff;
+      border-radius: 15px;
+      max-width: 900px;
+      margin: 20px auto;
+    }
+
+    .calendar-weekday {
+      font-weight: bold;
+      text-align: center;
+      padding: 10px 0;
+      background-color: #e0f0ff;
+      border-radius: 8px;
+    }
+
+    .calendar-day {
+      text-align: center;
+      padding: 12px 0;
+      cursor: pointer;
+      border-radius: 8px;
+      background-color: #f0f8ff;
+    }
+
+    .calendar-day:hover {
+      background-color: #cce6ff;
+    }
+
+    .selected-date {
+      border: 2px solid red;
+      font-weight: bold;
+    }
+
+    .container {
+      background: white;
+      max-width: 900px;
+      margin: 30px auto;
+      padding: 30px;
+      border-radius: 15px;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+    }
+
+    h1 {
+      font-size: 28px;
+      margin-bottom: 20px;
+    }
+
+    input, button {
+      padding: 10px;
+      font-size: 16px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+    }
+
+    .input-row {
+      margin: 15px 0;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      background-color: #007bff;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
+    .back-btn {
+      margin-top: 20px;
+      display: inline-block;
+      background-color: #007bff;
+      color: white;
+      border-radius: 8px;
+      padding: 10px 16px;
+      text-decoration: none;
+      font-size: 16px;
+    }
+
+    #reminderDisplay ul {
+      list-style: none;
+      padding-left: 0;
+    }
+
+    #reminderDisplay li {
+      background-color: #f8f8f8;
+      margin: 6px 0;
+      padding: 10px;
+      border-radius: 6px;
+    }
+
+    .section-title {
+      margin-top: 30px;
+      font-weight: bold;
+      font-size: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- 日历区域 -->
+<div id="calendar">
+  <div class="calendar-weekday">Sun</div>
+  <div class="calendar-weekday">Mon</div>
+  <div class="calendar-weekday">Tue</div>
+  <div class="calendar-weekday">Wed</div>
+  <div class="calendar-weekday">Thu</div>
+  <div class="calendar-weekday">Fri</div>
+  <div class="calendar-weekday">Sat</div>
+</div>
+
+<!-- 提醒事项模块 -->
+<div class="container">
+  <h1>🔔 Reminders</h1>
+
+  <div class="section-title">📧 Email Reminder</div>
+  <div class="input-row">
+    <input type="email" id="reminderEmail" placeholder="Enter email to send to" required>
+    <input type="date" id="reminderDate" required> <!-- 新增日期选择器 -->
+    <input type="time" id="reminderTime" required>
+  </div>
+  <div class="input-row">
+    <input type="text" id="reminderText" placeholder="Reminder content" required>
+    <button onclick="sendReminder()">Send Reminder</button>
+  </div>
+
+  <div class="section-title">📋 Reminders for <span id="dateLabel"></span></div>
+  <div id="reminderDisplay">
+    <ul id="reminderList"></ul>
+  </div>
+
+  <a href="dashboard.html" class="back-btn">← Back to Dashboard</a>
+</div>
+
+<script>
+  let selectedDate = new Date().toISOString().split("T")[0];
+  const reminders = JSON.parse(localStorage.getItem("emailReminders") || "{}");
+
+  function generateCalendar() {
+    const calendar = document.getElementById("calendar");
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = today.getMonth();
+    const firstDay = new Date(year, month, 1).getDay();
+    const totalDays = new Date(year, month + 1, 0).getDate();
+
+    document.querySelectorAll(".calendar-day").forEach(e => e.remove());
+
+    for (let i = 0; i < firstDay; i++) {
+      const empty = document.createElement("div");
+      calendar.appendChild(empty);
+    }
+
+    for (let day = 1; day <= totalDays; day++) {
+      const dateElem = document.createElement("div");
+      dateElem.classList.add("calendar-day");
+      dateElem.textContent = day;
+
+      const formatted = `${year}-${(month + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+      if (formatted === selectedDate) {
+        dateElem.classList.add("selected-date");
+      }
+
+      dateElem.addEventListener("click", () => {
+        selectedDate = formatted;
+        document.querySelectorAll(".calendar-day").forEach(e => e.classList.remove("selected-date"));
+        dateElem.classList.add("selected-date");
+        updateDateLabel();
+        displayReminders();
+      });
+
+      calendar.appendChild(dateElem);
+    }
+  }
+
+  function updateDateLabel() {
+    document.getElementById("dateLabel").textContent = selectedDate;
+    document.getElementById("reminderDate").value = selectedDate; // 自动更新日期选择器
+  }
+
+  function sendReminder() {
+    const email = document.getElementById("reminderEmail").value;
+    const time = document.getElementById("reminderTime").value;
+    const text = document.getElementById("reminderText").value.trim();
+    const chosenDate = document.getElementById("reminderDate").value || selectedDate;
+
+    if (!email || !time || !text || !chosenDate) {
+      alert("Please complete all fields");
+      return;
+    }
+
+    const createdAt = new Date().toISOString().replace("T"," ").substring(0,19);
+
+    const data = { email, time, date: chosenDate, message: text };
+
+    fetch("SendReminderServlet", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    })
+    .then(res => {
+      if (res.ok) {
+        alert("Reminder email scheduled successfully.");
+        storeReminder(email, chosenDate, time, text, createdAt);
+        displayReminders();
+        document.getElementById("reminderText").value = "";
+      } else {
+        alert("Failed to send reminder.");
+      }
+    });
+  }
+
+  function storeReminder(email, date, time, content, createdAt) {
+    if (!reminders[date]) {
+      reminders[date] = [];
+    }
+    reminders[date].push({ email, time, content, createdAt });
+    localStorage.setItem("emailReminders", JSON.stringify(reminders));
+  }
+
+  function displayReminders() {
+    const list = document.getElementById("reminderList");
+    list.innerHTML = "";
+    const daily = reminders[selectedDate] || [];
+
+    if (daily.length === 0) {
+      list.innerHTML = "<li>No reminders for this date.</li>";
+      return;
+    }
+
+    daily.forEach(r => {
+      const li = document.createElement("li");
+      li.innerHTML = `⏰ ${r.time} - ${r.content} 📤 to ${r.email}<br>
+                      <small>Created at: ${r.createdAt}</small>`;
+      list.appendChild(li);
+    });
+  }
+
+  window.onload = () => {
+    generateCalendar();
+    updateDateLabel();
+    displayReminders();
+  };
+</script>
+</body>
+</html>

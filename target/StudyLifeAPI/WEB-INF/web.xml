@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app version="4.0" id="WebApp_ID"
+         xmlns="http://xmlns.jcp.org/xml/ns/javaee"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/javaee
+                             http://xmlns.jcp.org/xml/ns/javaee/web-app_4_0.xsd">
+
+    <display-name>StudyLifeAPI</display-name>
+
+    <!-- ===== 可选：统一请求/响应 UTF-8 ===== -->
+    <filter>
+        <filter-name>Utf8Filter</filter-name>
+        <filter-class>org.apache.catalina.filters.SetCharacterEncodingFilter</filter-class>
+        <init-param>
+            <param-name>encoding</param-name>
+            <param-value>UTF-8</param-value>
+        </init-param>
+        <init-param>
+            <param-name>ignore</param-name>
+            <param-value>false</param-value>
+        </init-param>
+    </filter>
+    <filter-mapping>
+        <filter-name>Utf8Filter</filter-name>
+        <url-pattern>/*</url-pattern>
+    </filter-mapping>
+
+    <!-- ===== 你的首页列表，原样保留 ===== -->
+    <welcome-file-list>
+        <welcome-file>index.html</welcome-file>
+        <welcome-file>index.jsp</welcome-file>
+        <welcome-file>index.htm</welcome-file>
+        <welcome-file>default.html</welcome-file>
+        <welcome-file>default.jsp</welcome-file>
+        <welcome-file>default.htm</welcome-file>
+    </welcome-file-list>
+
+    <!-- ===== 你的 Servlets 与映射，原样保留 ===== -->
+    <servlet>
+        <servlet-name>SaveCountryServlet</servlet-name>
+        <servlet-class>com.studylife.servlet.SaveCountryServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>SaveCountryServlet</servlet-name>
+        <url-pattern>/api/save-country</url-pattern>
+    </servlet-mapping>
+
+    <servlet>
+        <servlet-name>RegisterServlet</servlet-name>
+        <servlet-class>com.studylife.servlet.RegisterServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>RegisterServlet</servlet-name>
+        <url-pattern>/api/register</url-pattern>
+    </servlet-mapping>
+
+    <servlet>
+        <servlet-name>LoginServlet</servlet-name>
+        <servlet-class>com.studylife.servlet.LoginServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>LoginServlet</servlet-name>
+        <url-pattern>/api/login</url-pattern>
+    </servlet-mapping>
+
+    <servlet>
+        <servlet-name>SendReminderServlet</servlet-name>
+        <servlet-class>com.studylife.servlet.SendReminderServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>SendReminderServlet</servlet-name>
+        <url-pattern>/api/send-reminder</url-pattern>
+    </servlet-mapping>
+
+    <!-- ===== 新增：JNDI 数据源声明（与服务器一致） ===== -->
+    <resource-ref>
+        <res-ref-name>jdbc/StudyLife</res-ref-name>
+        <res-type>javax.sql.DataSource</res-type>
+        <res-auth>Container</res-auth>
+    </resource-ref>
+
+    <!-- 可选：会话超时 -->
+    <session-config>
+        <session-timeout>30</session-timeout>
+    </session-config>
+</web-app>

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StudyLife Login</title>
+  <link rel="stylesheet" href="css/login.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap" rel="stylesheet">
+</head>
+<body>
+  <h1 class="logo-title">StudyLife</h1>
+
+  <div class="login-container">
+    <h2>Login</h2>
+    <input type="text" id="username" placeholder="Username">
+    <input type="password" id="password" placeholder="Password">
+    <button id="btnLogin" onclick="login()">Login</button>
+
+    <button onclick="window.location.href='register.html'" style="margin-top:10px;">
+      Register
+    </button>
+  </div>
+
+  <script>
+    // 计算当前应用的基路径，例如：http(s)://18.201.22.61:8080/StudyLifeAPI
+    function getAppBase() {
+      const { origin, pathname } = window.location;
+      const ctx = pathname.split('/')[1] || '';   // 取 /StudyLifeAPI 这一段
+      return `${origin}/${ctx}`;
+    }
+
+    async function login() {
+      const btn = document.getElementById("btnLogin");
+      const username = document.getElementById("username").value.trim();
+      const password = document.getElementById("password").value.trim();
+
+      if (!username || !password) {
+        alert("Please enter username and password.");
+        return;
+      }
+
+      btn.disabled = true;
+
+      try {
+        const base = getAppBase();
+        const url = `${base}/api/login?t=${Date.now()}`; // 加时间戳避免缓存
+
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          cache: "no-cache",
+          body: JSON.stringify({ username, password })
+        });
+
+        let data = {};
+        try { data = await res.json(); } catch (_) {}
+
+        if (!res.ok) {
+          throw new Error(data.message || `HTTP ${res.status}`);
+        }
+
+        if (data.status === "success") {
+          // 保存用户信息
+          localStorage.setItem("userId", data.userId);
+          localStorage.setItem("username", username);
+          window.location.href = "dashboard.html";
+        } else {
+          alert("❌ Login failed. " + (data.message || ""));
+        }
+      } catch (err) {
+        console.error(err);
+        alert("❌ Login failed.\n" + err.message);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+  </script>
+</body>
+</html>

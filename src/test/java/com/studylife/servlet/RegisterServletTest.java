@@ -27,7 +27,7 @@ public class RegisterServletTest {
         StringWriter out = new StringWriter();
         when(resp.getWriter()).thenReturn(new PrintWriter(out, true));
 
-        // ✅ 关键：给 servlet 做一次 init
+       
         RegisterServlet servlet = new RegisterServlet();
         ServletConfig cfg = mock(ServletConfig.class);
         ServletContext ctx = mock(ServletContext.class);
@@ -36,7 +36,7 @@ public class RegisterServletTest {
 
         servlet.doPost(req, resp);
 
-        // 放宽断言：只要有点“成功的”字段或 status 字段就行
+       
         String result = out.toString().toLowerCase();
         assertTrue(result.contains("success") || result.contains("\"status\""));
     }

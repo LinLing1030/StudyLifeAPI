@@ -51,7 +51,7 @@
 
       try {
         const base = getAppBase(); // 如 http://18.201.22.61:8080/StudyLifeAPI
-        const url = `${base}/api/register?t=${Date.now()}`; // 加时间戳避免缓存
+        const url = `${base}/api/register?t=${Date.now()}`;
 
         const res = await fetch(url, {
           method: "POST",
