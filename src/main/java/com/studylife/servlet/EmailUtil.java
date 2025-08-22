@@ -1,8 +1,3 @@
-//
-// Source code recreated from a .class file by IntelliJ IDEA
-// (powered by FernFlower decompiler)
-//
-
 package com.studylife.servlet;
 
 import java.util.Properties;
@@ -21,8 +16,8 @@ public class EmailUtil {
     }
 
     public static void sendEmail(String toEmail, String subject, String messageText) throws MessagingException {
-        String fromEmail = "llguo10300@gmail.com";
-        String password = "ocfl oicq uity xiyu";
+        final String fromEmail = "llguo10300@gmail.com";
+        final String password = "ocfl oicq uity xiyu";
         Properties props = new Properties();
         props.put("mail.smtp.host", "smtp.gmail.com");
         props.put("mail.smtp.port", "587");

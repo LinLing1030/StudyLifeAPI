@@ -62,7 +62,7 @@ public class EmailUtilTest {
 
     @Test
     public void sendHtmlEmail_ok() throws Exception {
-        EmailUtil.sendHtmlEmail("user@test.local", "HTML", "<b>Hi</b>");
+        EmailUtil.sendEmail("user@test.local", "HTML", "<b>Hi</b>");
 
         smtp.waitForIncomingEmail(1);
         MimeMessage[] msgs = smtp.getReceivedMessages();
