@@ -41,14 +41,8 @@
       background-color: #f0f8ff;
     }
 
-    .calendar-day:hover {
-      background-color: #cce6ff;
-    }
-
-    .selected-date {
-      border: 2px solid red;
-      font-weight: bold;
-    }
+    .calendar-day:hover { background-color: #cce6ff; }
+    .selected-date { border: 2px solid red; font-weight: bold; }
 
     .container {
       background: white;
@@ -59,10 +53,7 @@
       box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
     }
 
-    h1 {
-      font-size: 28px;
-      margin-bottom: 20px;
-    }
+    h1 { font-size: 28px; margin-bottom: 20px; }
 
     input, button {
       padding: 10px;
@@ -85,9 +76,7 @@
       cursor: pointer;
     }
 
-    button:hover {
-      background-color: #0056b3;
-    }
+    button:hover { background-color: #0056b3; }
 
     .back-btn {
       margin-top: 20px;
@@ -100,10 +89,7 @@
       font-size: 16px;
     }
 
-    #reminderDisplay ul {
-      list-style: none;
-      padding-left: 0;
-    }
+    #reminderDisplay ul { list-style: none; padding-left: 0; }
 
     #reminderDisplay li {
       background-color: #f8f8f8;
@@ -142,7 +128,7 @@
   <div class="section-title">📧 Email Reminder</div>
   <div class="input-row">
     <input type="email" id="reminderEmail" placeholder="Enter email to send to" required>
-    <input type="date" id="reminderDate" required> <!-- 新增日期选择器 -->
+    <input type="date" id="reminderDate" required>
     <input type="time" id="reminderTime" required>
   </div>
   <div class="input-row">
@@ -159,6 +145,13 @@
 </div>
 
 <script>
+  // === 新增：自动拼接项目 Context Path，避免相对路径 404 ===
+  function apiUrl(path) {
+    const parts = location.pathname.split('/').filter(Boolean);
+    const ctx = parts.length ? `/${parts[0]}` : '';
+    return `${ctx}/${path}`;
+  }
+
   let selectedDate = new Date().toISOString().split("T")[0];
   const reminders = JSON.parse(localStorage.getItem("emailReminders") || "{}");
 
@@ -216,23 +209,30 @@
     }
 
     const createdAt = new Date().toISOString().replace("T"," ").substring(0,19);
-
     const data = { email, time, date: chosenDate, message: text };
 
-    fetch("SendReminderServlet", {
+    // === 改动：用 apiUrl，并读取返回文本 + 显示错误 ===
+    fetch(apiUrl("SendReminderServlet"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data)
     })
-    .then(res => {
+    .then(async res => {
+      const txt = await res.text();
       if (res.ok) {
+        console.log("OK:", txt);
         alert("Reminder email scheduled successfully.");
         storeReminder(email, chosenDate, time, text, createdAt);
         displayReminders();
         document.getElementById("reminderText").value = "";
       } else {
-        alert("Failed to send reminder.");
+        console.error("FAIL:", res.status, txt);
+        alert("Failed to send reminder: " + txt);
       }
+    })
+    .catch(err => {
+      console.error("NETWORK ERROR:", err);
+      alert("Network error: " + err.message);
     });
   }
 
