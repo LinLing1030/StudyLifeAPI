@@ -9,9 +9,8 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.PreparedStatement;
+import java.nio.charset.StandardCharsets;
+import java.sql.*;
 
 /**
  * POST /api/save-country
@@ -20,26 +19,33 @@ import java.sql.PreparedStatement;
 @WebServlet(name = "SaveCountryServlet", urlPatterns = {"/api/save-country"})
 public class SaveCountryServlet extends HttpServlet {
 
-    // === 根据你的环境修改这三项 ===
-    private static final String JDBC_URL  =
-            "jdbc:mysql://localhost:3306/studylife_db?serverTimezone=UTC&useUnicode=true&characterEncoding=utf8";
-    private static final String JDBC_USER = "root";
-    private static final String JDBC_PWD  = "RootRoot##";
+
+    private static final String JDBC_URL =
+            "jdbc:mysql://127.0.0.1:3306/studylife_db"
+            + "?serverTimezone=UTC"
+            + "&useSSL=false"
+            + "&allowPublicKeyRetrieval=true"
+            + "&useUnicode=true&characterEncoding=utf8";
+
+    private static final String JDBC_USER = "studyuser";
+    private static final String JDBC_PWD  = "Study2025!";
+
+
+    @Override
+    protected void doOptions(HttpServletRequest req, HttpServletResponse resp)
+            throws ServletException, IOException {
+        addCorsHeaders(resp);
+        resp.setStatus(HttpServletResponse.SC_OK);
+    }
 
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
 
-        // ----- CORS -----
-        response.setHeader("Access-Control-Allow-Origin", "*");
-        response.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS, DELETE");
-        response.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-
-        // ----- 编码 & 返回类型 -----
-        request.setCharacterEncoding("UTF-8");
+        addCorsHeaders(response);
+        request.setCharacterEncoding(StandardCharsets.UTF_8.name());
         response.setContentType("application/json; charset=UTF-8");
 
-        // ----- 读取请求体 -----
         StringBuilder body = new StringBuilder();
         try (BufferedReader reader = request.getReader()) {
             String line;
@@ -49,44 +55,58 @@ public class SaveCountryServlet extends HttpServlet {
         }
 
         try {
-            // 解析 JSON
+         
             JSONObject json = new JSONObject(body.toString());
-            String userId  = json.getString("userId");
-            String country = json.getString("country");
+            String userId  = json.optString("userId", "").trim();
+            String country = json.optString("country", "").trim();
 
-            // JDBC 驱动（MySQL 8+）
+            if (userId.isEmpty() || country.isEmpty()) {
+                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                response.getWriter().write("{\"status\":\"fail\",\"message\":\"userId and country are required\"}");
+                return;
+            }
+
+
             Class.forName("com.mysql.cj.jdbc.Driver");
 
-            // 写库
+
             String sql = "INSERT INTO user_login_locations (user_id, country) VALUES (?, ?)";
+            long generatedId = -1L;
             try (Connection conn = DriverManager.getConnection(JDBC_URL, JDBC_USER, JDBC_PWD);
-                 PreparedStatement ps = conn.prepareStatement(sql)) {
+                 PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+
                 ps.setString(1, userId);
                 ps.setString(2, country);
                 ps.executeUpdate();
+
+                try (ResultSet rs = ps.getGeneratedKeys()) {
+                    if (rs.next()) {
+                        generatedId = rs.getLong(1);
+                    }
+                }
             }
 
-            // 成功
+      
+            JSONObject ok = new JSONObject();
+            ok.put("status", "success");
+            ok.put("id", generatedId);
+            ok.put("userId", userId);
+            ok.put("country", country);
             response.setStatus(HttpServletResponse.SC_OK);
-            response.getWriter().write("{\"status\":\"success\"}");
+            response.getWriter().write(ok.toString());
 
         } catch (Exception e) {
-            // 失败
             e.printStackTrace();
+            String msg = e.getMessage() == null ? "internal error" : e.getMessage().replace("\"", "\\\"");
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-            // 注意：生产环境不要把 e.getMessage() 原样返回给前端
-            response.getWriter().write(
-                    "{\"status\":\"error\",\"message\":\"" + e.getMessage().replace("\"","\\\"") + "\"}"
-            );
+            response.getWriter().write("{\"status\":\"error\",\"message\":\"" + msg + "\"}");
         }
     }
 
-    @Override
-    protected void doOptions(HttpServletRequest req, HttpServletResponse resp)
-            throws ServletException, IOException {
+    
+    private void addCorsHeaders(HttpServletResponse resp) {
         resp.setHeader("Access-Control-Allow-Origin", "*");
         resp.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS, DELETE");
         resp.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-        resp.setStatus(HttpServletResponse.SC_OK);
     }
 }

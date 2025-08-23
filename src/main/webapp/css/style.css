@@ -1,4 +1,4 @@
-/* 全局样式 */
+
 body {
   font-family: Arial, sans-serif;
   background-color: #f9fbfc;
@@ -50,7 +50,7 @@ li.done {
   color: gray;
 }
 
-/* 每个模块标题样式统一 */
+
 .section-title {
   margin-top: 40px;
   margin-bottom: 15px;
@@ -60,7 +60,7 @@ li.done {
   padding-left: 10px;
 }
 
-/* 输入行：收入和支出 */
+
 .input-row {
   display: flex;
   align-items: center;
@@ -82,7 +82,7 @@ li.done {
   white-space: nowrap;
 }
 
-/* 日历模块 */
+
 #calendar {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -119,14 +119,14 @@ button#prevMonth, button#nextMonth {
   cursor: pointer;
 }
 
-/* 高亮选中日期 */
+
 .selected-date {
   background-color: #ffd54f;
   font-weight: bold;
   border: 2px solid #f57c00;
 }
 
-/* Mood Tracker 模块样式 */
+
 #moodModule .input-row {
   display: flex;
   align-items: center;

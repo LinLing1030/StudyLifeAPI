@@ -112,9 +112,8 @@ function generateCalendar(year, month) {
   }
 })();
 
-// =====================================================
+// -------------------
 // Geolocation + Map + Weather
-// =====================================================
 
 const DEFAULT_COORD = { lat: 53.3498, lng: -6.2603 }; // Dublin fallback
 
@@ -166,10 +165,9 @@ function renderMapAndWeather(lat, lng, isFallback) {
 }
 
 function getWeather(lat, lng, isFallback) {
-  // reverse geocoding first
   fetch("https://nominatim.openstreetmap.org/reverse?format=json&lat=" + lat + "&lon=" + lng)
-    .then(function (res) { return res.json(); })
-    .then(function (locationData) {
+    .then(res => res.json())
+    .then(locationData => {
       const a = locationData && locationData.address ? locationData.address : null;
       const fallbackCity = isFallback ? "Dublin (fallback)" : "Unknown Location";
       let city = null;
@@ -186,70 +184,65 @@ function getWeather(lat, lng, isFallback) {
       }
       if (!city) city = fallbackCity;
 
-      const url =
-        "https://api.open-meteo.com/v1/forecast" +
-        "?latitude=" + lat +
-        "&longitude=" + lng +
-        "&current_weather=true";
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current_weather=true`;
 
       return fetch(url)
-        .then(function (r) { return r.json(); })
-        .then(function (data) { return { city: city, data: data }; });
+        .then(r => r.json())
+        .then(data => ({ city, data }));
     })
-	.then(function (payload) {
-	    const city = payload.city;
-	    const data = payload.data;
+    .then(payload => {
+      const city = payload.city;
+      const data = payload.data;
 
-	    const weather = (data && data.current_weather) ? data.current_weather : {};
-	    const display = document.getElementById("weatherDisplay");
-	    if (!display) return;
+      const weather = (data && data.current_weather) ? data.current_weather : {};
+      const display = document.getElementById("weatherDisplay");
+      if (!display) return;
 
-	    const temp = (weather.temperature !== undefined && weather.temperature !== null ? weather.temperature : "--") + " °C";
-	    const wind = (weather.windspeed !== undefined && weather.windspeed !== null ? weather.windspeed : "--") + " km/h";
+      const temp = (weather.temperature !== undefined ? weather.temperature : "--") + " °C";
+      const wind = (weather.windspeed !== undefined ? weather.windspeed : "--") + " km/h";
 
-	    display.innerHTML =
-	        "<p><strong>Location:</strong> " + city + "</p>" +
-	        "<p><strong>Temperature:</strong> " + temp + "</p>" +
-	        "<p><strong>Windspeed:</strong> " + wind + "</p>";
-	})
-    .catch(function (err) {
-      console.error("Weather/location fetch error:", err);
+      display.innerHTML =
+        `<p><strong>Location:</strong> ${city}</p>
+         <p><strong>Temperature:</strong> ${temp}</p>
+         <p><strong>Windspeed:</strong> ${wind}</p>`;
+    })
+    .catch(e => {
+      console.error("Weather/location fetch error:", e);
       const el = document.getElementById("weatherDisplay");
-      if (el) el.innerText = "Failed to load location or weather data.";
+      if (el) el.textContent = "Failed to load location or weather data.";
     });
 }
 
 // -------------------
-// Save user country (relative path)
+// Save user country to backend
 
 function getLocationAndSendToBackend(userId) {
-  if (!navigator.geolocation) return;
-  if (!isSecureContextForGeo()) return;
+  if (!navigator.geolocation || !isSecureContextForGeo()) return;
 
   navigator.geolocation.getCurrentPosition(
-    function (position) {
-      const lat = position.coords.latitude;
-      const lng = position.coords.longitude;
+    pos => {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
 
-      fetch("https://nominatim.openstreetmap.org/reverse?format=json&lat=" + lat + "&lon=" + lng)
-        .then(function (response) { return response.json(); })
-		.then(function (data) {
-		    let country = "Unknown";
-		    if (data && data.address && data.address.country) {
-		        country = data.address.country;
-		    }
+      fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
+        .then(r => r.json())
+        .then(data => {
+          let country = "Unknown";
+          if (data && data.address && data.address.country) {
+            country = data.address.country;
+          }
 
-		    return fetch("api/save-country", {
-		        method: "POST",
-		        headers: { "Content-Type": "application/json" },
-		        body: JSON.stringify({ userId: userId, country: country })
-		    });
-		})
-		.then(function (res) { return res.text(); })
-		.then(function (text) { console.log("Country saved:", text); })
-		.catch(function (err) { console.error("Error saving country:", err); });
+          return fetch("api/save-country", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId: userId, country: country })
+          });
+        })
+        .then(res => res.text())
+        .then(text => console.log("Country saved:", text))
+        .catch(err => console.error("Error saving country:", err));
     },
-    function () { /* ignore */ },
+    () => { /* ignore */ },
     { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
   );
 }
@@ -272,7 +265,7 @@ function initWaterTracker() {
   const amount = data[today] || 0;
 
   const el = document.getElementById("waterAmount");
-  if (el) el.innerText = amount + " / 2000 ml";
+  if (el) el.textContent = `${amount} / 2000 ml`;
 }
 
 function addWater(amount) {
@@ -290,7 +283,7 @@ function addWater(amount) {
 
   localStorage.setItem("waterData", JSON.stringify(data));
   const el = document.getElementById("waterAmount");
-  if (el) el.innerText = next + " / 2000 ml";
+  if (el) el.textContent = `${next} / 2000 ml`;
 }
 
 function addWaterCustom() {

@@ -22,10 +22,10 @@
   </div>
 
   <script>
-    // 计算当前应用的基路径，例如：http(s)://18.201.22.61:8080/StudyLifeAPI
+   
     function getAppBase() {
       const { origin, pathname } = window.location;
-      const ctx = pathname.split('/')[1] || '';   // 取 /StudyLifeAPI 这一段
+      const ctx = pathname.split('/')[1] || '';   
       return `${origin}/${ctx}`;
     }
 
@@ -43,7 +43,7 @@
 
       try {
         const base = getAppBase();
-        const url = `${base}/api/login?t=${Date.now()}`; // 加时间戳避免缓存
+        const url = `${base}/api/login?t=${Date.now()}`; 
 
         const res = await fetch(url, {
           method: "POST",
@@ -60,7 +60,7 @@
         }
 
         if (data.status === "success") {
-          // 保存用户信息
+         
           localStorage.setItem("userId", data.userId);
           localStorage.setItem("username", username);
           window.location.href = "dashboard.html";

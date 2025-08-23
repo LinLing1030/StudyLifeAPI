@@ -9,33 +9,34 @@ import javax.mail.internet.MimeMessage;
 public class EmailUtil {
 
     
-    private static String env(String k, String def) {
-        String v = System.getenv(k);
-        return (v == null || v.isEmpty()) ? def : v;
+    private static boolean mailDebug() {
+        String v = System.getenv("MAIL_DEBUG");
+        return v != null && (v.equalsIgnoreCase("1") || v.equalsIgnoreCase("true"));
     }
 
     public static void sendEmail(String toEmail, String subject, String messageText) throws MessagingException {
-        final String fromEmail = env("MAIL_FROM", "llguo10300@gmail.com");
-        final String username  = env("MAIL_USER", "llguo10300@gmail.com");
-        final String password  = env("MAIL_PASS", "ocfloicquityxiyu"); // ← 没有空格！
+        final String fromEmail = "llguo10300@gmail.com";
+        
+        final String password  = "ocfloicquityxiyu";
 
         Properties props = new Properties();
-        props.put("mail.smtp.host", env("MAIL_HOST", "smtp.gmail.com"));
-        props.put("mail.smtp.port", env("MAIL_PORT", "587"));
+        props.put("mail.smtp.host", "smtp.gmail.com");
+        props.put("mail.smtp.port", "587");
         props.put("mail.smtp.auth", "true");
         props.put("mail.smtp.starttls.enable", "true");
-        
+        props.put("mail.smtp.starttls.required", "true");
         props.put("mail.smtp.ssl.trust", "smtp.gmail.com");
-        
         props.put("mail.smtp.connectiontimeout", "8000");
         props.put("mail.smtp.timeout", "10000");
-      
-        // Session session = Session.getInstance(props); session.setDebug(true);
+        
+        props.put("mail.smtp.ssl.protocols", "TLSv1.2 TLSv1.3");
+
         Session session = Session.getInstance(props, new Authenticator() {
             @Override protected PasswordAuthentication getPasswordAuthentication() {
-                return new PasswordAuthentication(username, password);
+                return new PasswordAuthentication(fromEmail, password);
             }
         });
+        session.setDebug(mailDebug());
 
         MimeMessage message = new MimeMessage(session);
         message.setFrom(new InternetAddress(fromEmail));
