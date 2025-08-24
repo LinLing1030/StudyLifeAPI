@@ -141,4 +141,37 @@ public class SendReminderServletTest {
         for (String k : keys) if (k != null && t.contains(k.toLowerCase())) return true;
         return false;
         }
+
+    static class NotTerminatingScheduler extends ScheduledThreadPoolExecutor {
+        NotTerminatingScheduler() { super(1); }
+        @Override
+        public boolean awaitTermination(long timeout, TimeUnit unit) {
+            return false; 
+        }
+    }
+
+    @Test
+    public void destroy_shouldShutdownNow_whenNotTerminated() {
+        SendReminderServlet s = new TestableServlet(new NotTerminatingScheduler(), (a,b,c)->{}, Map.of());
+        s.destroy();
+    }
+
+
+    static class InterruptingScheduler extends ScheduledThreadPoolExecutor {
+        InterruptingScheduler() { super(1); }
+        @Override
+        public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException {
+            throw new InterruptedException("boom"); 
+        }
+    }
+
+    @Test
+    public void destroy_shouldHandleInterruptedException() {
+        SendReminderServlet s = new TestableServlet(new InterruptingScheduler(), (a,b,c)->{}, Map.of());
+        s.destroy();
+        assertTrue("thread should be interrupted after destroy() catch",
+                Thread.currentThread().isInterrupted());
+        Thread.interrupted();
+    }
+
 }
