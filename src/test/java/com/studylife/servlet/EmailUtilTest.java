@@ -6,7 +6,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import javax.mail.internet.MimeMessage;
+import jakarta.mail.internet.MimeMessage;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -17,10 +17,18 @@ public class EmailUtilTest {
 
     @Before
     public void startSmtp() {
-        smtp = new GreenMail(ServerSetupTest.SMTP);
+        smtp = new GreenMail(ServerSetupTest.SMTP); 
         smtp.start();
-
         smtp.setUser("noreply@test.local", "noreply@test.local", "dummy");
+
+        System.setProperty("MAIL_SMTP_HOST", "localhost");
+        System.setProperty("MAIL_SMTP_PORT", "3025");
+        System.setProperty("MAIL_STARTTLS",  "false");
+        System.setProperty("MAIL_SSL",       "false");
+        System.setProperty("MAIL_USERNAME",  "noreply@test.local");
+        System.setProperty("MAIL_PASSWORD",  "dummy");
+        System.setProperty("MAIL_FROM",      "noreply@test.local");
+        System.setProperty("MAIL_DEBUG",     "false");
 
         System.setProperty("SMTP_HOST", "localhost");
         System.setProperty("SMTP_PORT", "3025");
@@ -29,28 +37,23 @@ public class EmailUtilTest {
         System.setProperty("SMTP_USER", "noreply@test.local");
         System.setProperty("SMTP_PASS", "dummy");
         System.setProperty("SMTP_FROM", "noreply@test.local");
-
-        System.setProperty("MAIL_DEBUG", "true");
     }
 
     @After
     public void stopSmtp() {
         if (smtp != null) smtp.stop();
-
-        System.clearProperty("SMTP_HOST");
-        System.clearProperty("SMTP_PORT");
-        System.clearProperty("SMTP_STARTTLS");
-        System.clearProperty("SMTP_SSL");
-        System.clearProperty("SMTP_USER");
-        System.clearProperty("SMTP_PASS");
-        System.clearProperty("SMTP_FROM");
-        System.clearProperty("MAIL_DEBUG");
+        String[] keys = {
+            "MAIL_SMTP_HOST","MAIL_SMTP_PORT","MAIL_STARTTLS","MAIL_SSL",
+            "MAIL_USERNAME","MAIL_PASSWORD","MAIL_FROM","MAIL_DEBUG",
+            "SMTP_HOST","SMTP_PORT","SMTP_STARTTLS","SMTP_SSL",
+            "SMTP_USER","SMTP_PASS","SMTP_FROM"
+        };
+        for (String k: keys) System.clearProperty(k);
     }
 
     @Test
     public void sendPlainEmail_ok() throws Exception {
         EmailUtil.sendEmail("user@test.local", "Unit Test", "Hello from unit test.");
-
         smtp.waitForIncomingEmail(1);
         MimeMessage[] msgs = smtp.getReceivedMessages();
         assertEquals(1, msgs.length);
@@ -60,14 +63,11 @@ public class EmailUtilTest {
     @Test
     public void sendHtmlEmail_ok() throws Exception {
         EmailUtil.sendEmail("user@test.local", "HTML", "<b>Hi</b>");
-
         smtp.waitForIncomingEmail(1);
         MimeMessage[] msgs = smtp.getReceivedMessages();
         assertEquals(1, msgs.length);
         assertEquals("HTML", msgs[0].getSubject());
-
-        Object content = msgs[0].getContent();
-        String body = (content instanceof String) ? (String) content : content.toString();
+        String body = String.valueOf(msgs[0].getContent());
         assertTrue(body.contains("<b>Hi</b>"));
     }
 }

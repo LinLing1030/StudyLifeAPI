@@ -14,15 +14,20 @@ import java.util.concurrent.*;
 @WebServlet("/SendReminderServlet")
 public class SendReminderServlet extends HttpServlet {
 
-    // 固定大小线程池：负责定时任务
     private static final ScheduledExecutorService SCHEDULER =
             Executors.newScheduledThreadPool(5);
-
-    // 统一时区 & 格式
+    
     private static final ZoneId ZONE_ID = ZoneId.of("Europe/Dublin");
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("HH:mm");
     private static final DateTimeFormatter TS_FMT   = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+    private static int minLeadMinutes() {
+        String v = System.getenv("REMINDER_MIN_LEAD_MINUTES");
+        if (v == null || v.trim().isEmpty()) return 5;
+        try { return Math.max(0, Integer.parseInt(v.trim())); }
+        catch (NumberFormatException ignore) { return 5; }
+    }
 
     @Override
     protected void doOptions(HttpServletRequest req, HttpServletResponse resp) throws IOException {
@@ -41,17 +46,23 @@ public class SendReminderServlet extends HttpServlet {
         String body = readBody(request);
 
         try (PrintWriter out = response.getWriter()) {
-            JSONObject json = new JSONObject(body);
+            JSONObject json;
+            try {
+                json = new JSONObject(body);
+            } catch (org.json.JSONException je) {
+                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                out.print("{\"status\":\"error\",\"message\":\"invalid json\"}");
+                return;
+            }
 
-         
             String email   = json.optString("email", "").trim();
-            String dateStr = json.optString("date", "").trim(); // yyyy-MM-dd
-            String timeStr = json.optString("time", "").trim(); // HH:mm
+            String dateStr = json.optString("date", "").trim(); 
+            String timeStr = json.optString("time", "").trim(); 
             String message = json.optString("message", "").trim();
 
             if (email.isEmpty() || dateStr.isEmpty() || timeStr.isEmpty() || message.isEmpty()) {
                 response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                out.print("{\"status\":\"error\",\"message\":\"Missing required fields\"}");
+                out.print("{\"status\":\"error\",\"message\":\"missing required fields\"}");
                 return;
             }
 
@@ -62,23 +73,23 @@ public class SendReminderServlet extends HttpServlet {
                 time = LocalTime.parse(timeStr, TIME_FMT);
             } catch (DateTimeParseException ex) {
                 response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                out.print("{\"status\":\"error\",\"message\":\"Invalid date or time format\"}");
+                out.print("{\"status\":\"error\",\"message\":\"invalid date or time format\"}");
                 return;
             }
 
-            
             ZonedDateTime nowZ = ZonedDateTime.now(ZONE_ID);
             ZonedDateTime targetZ = ZonedDateTime.of(date, time, ZONE_ID);
 
-            if (targetZ.isBefore(nowZ)) {
+            int minLead = minLeadMinutes();
+            if (targetZ.isBefore(nowZ.plusMinutes(minLead))) {
                 response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                out.print("{\"status\":\"error\",\"message\":\"Selected time has already passed.\"}");
+                out.print("{\"status\":\"error\",\"message\":\"Selected time is in the past or before minimum lead time (" +
+                        minLead + "m).\"}");
                 return;
             }
 
             long delayMillis = Duration.between(nowZ, targetZ).toMillis();
 
-            
             final String subject = "Reminder Alert";
             final String fullMsg = "⏰ Reminder at " + dateStr + " " + timeStr + ":\n\n" + message;
 
@@ -93,12 +104,10 @@ public class SendReminderServlet extends HttpServlet {
                 }
             }, delayMillis, TimeUnit.MILLISECONDS);
 
-            
             JSONObject res = new JSONObject()
-                    .put("status", "success")
+                    .put("status", "scheduled")
                     .put("scheduledFor", TS_FMT.format(targetZ))
-                    .put("now", TS_FMT.format(nowZ))
-                    .put("mode", "scheduled");
+                    .put("now", TS_FMT.format(nowZ));
             response.setStatus(HttpServletResponse.SC_OK);
             out.print(res.toString());
 
@@ -106,13 +115,11 @@ public class SendReminderServlet extends HttpServlet {
             e.printStackTrace();
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             try (PrintWriter out = response.getWriter()) {
-                out.print("{\"status\":\"error\",\"message\":\"" +
-                        e.getMessage().replace("\"", "\\\"") + "\"}");
+                out.print("{\"status\":\"error\",\"message\":\"server error\"}");
             }
         }
     }
 
-   
     @Override
     public void destroy() {
         SCHEDULER.shutdown();
@@ -127,7 +134,6 @@ public class SendReminderServlet extends HttpServlet {
         super.destroy();
     }
 
-    
     private static void addCors(HttpServletResponse resp) {
         resp.setHeader("Access-Control-Allow-Origin", "*");
         resp.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");

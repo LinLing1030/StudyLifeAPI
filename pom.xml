@@ -16,19 +16,21 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
-    <!-- Compile to Java 11 bytecode so it runs on your server (JRE 11) -->
+    <!-- Compile for Java 11 runtime -->
     <java.version>11</java.version>
 
+    <!-- Versions -->
     <junit.version>4.13.2</junit.version>
     <mockito.version>5.12.0</mockito.version>
     <h2.version>2.2.224</h2.version>
-    <greenmail.version>1.6.11</greenmail.version>
+    <greenmail.version>2.1.1</greenmail.version>
+    <slf4j.version>2.0.13</slf4j.version>
     <jacoco.version>0.8.12</jacoco.version>
     <surefire.version>3.2.5</surefire.version>
   </properties>
 
   <dependencies>
-    <!-- Servlet API is provided by the container (Tomcat) -->
+    <!-- Servlet API provided by container (Tomcat) -->
     <dependency>
       <groupId>javax.servlet</groupId>
       <artifactId>javax.servlet-api</artifactId>
@@ -36,7 +38,7 @@
       <scope>provided</scope>
     </dependency>
 
-    <!-- MySQL JDBC driver is packaged into the WAR -->
+    <!-- MySQL JDBC -->
     <dependency>
       <groupId>com.mysql</groupId>
       <artifactId>mysql-connector-j</artifactId>
@@ -57,21 +59,21 @@
       <version>0.4</version>
     </dependency>
 
-    <!-- JavaMail -->
+    <!-- JavaMail (javax.mail) -->
     <dependency>
       <groupId>com.sun.mail</groupId>
       <artifactId>javax.mail</artifactId>
       <version>1.6.2</version>
     </dependency>
 
-    <!-- Activation -->
+    <!-- Activation for JavaMail -->
     <dependency>
       <groupId>com.sun.activation</groupId>
       <artifactId>javax.activation</artifactId>
       <version>1.2.0</version>
     </dependency>
 
-    <!-- Test dependencies -->
+    <!-- ===== Test deps ===== -->
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
@@ -93,31 +95,35 @@
       <scope>test</scope>
     </dependency>
 
+    <!-- GreenMail: in-memory SMTP/IMAP/POP3 server for tests -->
     <dependency>
       <groupId>com.icegreen</groupId>
       <artifactId>greenmail</artifactId>
       <version>${greenmail.version}</version>
       <scope>test</scope>
     </dependency>
+
+    <!-- Silence SLF4J "StaticLoggerBinder" warnings in tests -->
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-simple</artifactId>
+      <version>${slf4j.version}</version>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>
-    <!-- Fix WAR file name to StudyLifeAPI.war -->
+    <!-- Final WAR name -->
     <finalName>StudyLifeAPI</finalName>
 
     <plugins>
-      <!-- Compile with Java 11 bytecode -->
+      <!-- Java 11 bytecode -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
         <version>3.11.0</version>
         <configuration>
-          <!-- Using 'release' ensures both source/target and stdlib matching -->
           <release>${java.version}</release>
-          <!-- (Optional fallback) Uncomment if you ever need explicit flags:
-          <source>${java.version}</source>
-          <target>${java.version}</target>
-          -->
         </configuration>
       </plugin>
 
@@ -132,7 +138,7 @@
         </configuration>
       </plugin>
 
-      <!-- JUnit 4 runner -->
+      <!-- Unit tests -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
@@ -161,15 +167,13 @@
         </executions>
       </plugin>
 
-      <!-- Sonar Scanner for Maven (used in CI) -->
+      <!-- Sonar -->
       <plugin>
         <groupId>org.sonarsource.scanner.maven</groupId>
         <artifactId>sonar-maven-plugin</artifactId>
         <version>3.9.1.2184</version>
       </plugin>
 
-      <!-- Enforcer: allow building with JDK 11..17 (CI uses 17),
-           but our bytecode stays at Java 11 -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-enforcer-plugin</artifactId>
@@ -183,7 +187,6 @@
             <configuration>
               <rules>
                 <requireJavaVersion>
-                  <!-- Allow running Maven with JDK 11 up to (but not including) 18 -->
                   <version>[11,18)</version>
                 </requireJavaVersion>
               </rules>
@@ -194,5 +197,4 @@
       </plugin>
     </plugins>
   </build>
-
 </project>

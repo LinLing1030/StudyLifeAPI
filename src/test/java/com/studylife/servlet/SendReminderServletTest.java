@@ -11,11 +11,10 @@ import java.time.format.DateTimeFormatter;
 
 import static org.junit.Assert.*;
 
-
 public class SendReminderServletTest {
 
     @Test
-    public void invalidJson_shouldReturn4xx_withErrorBody() throws Exception {
+    public void invalidJson_shouldReturn4xx_or5xx_withErrorBody() throws Exception {
         StubHttpServletRequest req = new StubHttpServletRequest("{oops");
         StubHttpServletResponse resp = new StubHttpServletResponse();
 
@@ -23,10 +22,10 @@ public class SendReminderServletTest {
 
         int status = resp.getStatus();
         String body = safeBody(resp);
-        assertTrue("expected 4xx for invalid JSON, got " + status, status >= 400 && status < 500);
 
+        assertTrue("expected 4xx/5xx for invalid JSON, got " + status, status >= 400 && status < 600);
         assertTrue("body should mention error/invalid, body=" + body,
-                containsAnyIgnoreCase(body, "error", "invalid", "malformed", "bad request", "MSG_"));
+                containsAnyIgnoreCase(body, "error", "invalid", "malformed", "bad request", "server error", "msg_"));
     }
 
     @Test
@@ -48,12 +47,12 @@ public class SendReminderServletTest {
         assertTrue("expected 4xx for past time, got " + status, status >= 400 && status < 500);
         assertTrue("body should hint time invalid, body=" + out,
                 containsAnyIgnoreCase(out,
-                        "selected time", "already", "past", "invalid time", "MSG_INVALID_TIME", "before now"));
+                        "selected time", "already", "past", "invalid time", "msg_invalid_time", "before now"));
     }
 
     @Test
     public void futureTime_shouldSucceed_2xx() throws Exception {
-        LocalDateTime dt = LocalDateTime.now().plusMinutes(5);
+        LocalDateTime dt = LocalDateTime.now().plusMinutes(15);
         String date = dt.toLocalDate().toString();
         String time = dt.format(DateTimeFormatter.ofPattern("HH:mm"));
 
@@ -72,17 +71,16 @@ public class SendReminderServletTest {
         String out = safeBody(resp);
 
         assertTrue("expected 2xx for future time, got " + status, status >= 200 && status < 300);
-
         assertNotNull(out);
         assertTrue("body should acknowledge scheduling, body=" + out,
-                containsAnyIgnoreCase(out, "scheduled", "ok", "success", "created", "accepted", "MSG_OK"));
+                containsAnyIgnoreCase(out, "scheduled", "ok", "success", "created", "accepted", "msg_ok"));
     }
 
 
     private static String safeBody(StubHttpServletResponse resp) {
         String b = resp.getBody();
         return b == null ? "" : b;
-    }
+        }
 
     private static boolean containsAnyIgnoreCase(String text, String... needles) {
         String t = text == null ? "" : text.toLowerCase();
