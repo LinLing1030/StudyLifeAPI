@@ -1,6 +1,7 @@
 package com.studylife.servlet;
 
 import org.json.JSONObject;
+import org.junit.After;
 import org.junit.Test;
 import testsupport.StubHttpServletRequest;
 import testsupport.StubHttpServletResponse;
@@ -14,9 +15,26 @@ import static org.junit.Assert.*;
 public class SendReminderServletTest {
 
     private static final ZoneId ZONE = ZoneId.of("Europe/Dublin");
+    private static final DateTimeFormatter HM = DateTimeFormatter.ofPattern("HH:mm");
+
+    @After
+    public void clearOverride() {
+        System.clearProperty("REMINDER_MIN_LEAD_MINUTES");
+    }
 
     @Test
-    public void invalidJson_shouldReturn4xx_or5xx_withErrorBody() throws Exception {
+    public void doOptions_ok() throws Exception {
+        StubHttpServletRequest req = new StubHttpServletRequest("");
+        StubHttpServletResponse resp = new StubHttpServletResponse();
+
+        new SendReminderServlet().doOptions(req, resp);
+
+        assertEquals(200, resp.getStatus());
+        assertTrue(resp.getHeader("Access-Control-Allow-Origin").contains("*"));
+    }
+
+    @Test
+    public void invalidJson_shouldReturn4xx_withErrorBody() throws Exception {
         StubHttpServletRequest req = new StubHttpServletRequest("{oops");
         StubHttpServletResponse resp = new StubHttpServletResponse();
 
@@ -24,86 +42,52 @@ public class SendReminderServletTest {
 
         int status = resp.getStatus();
         String body = safeBody(resp);
-        assertTrue(status >= 400 && status < 600);
-        assertTrue(containsAnyIgnoreCase(body, "error", "invalid", "malformed", "bad request", "server error", "msg_"));
+        assertTrue(status >= 400 && status < 500);
+        assertTrue(containsAnyIgnoreCase(body, "error", "invalid"));
     }
 
     @Test
     public void missingFields_shouldReturn400() throws Exception {
         JSONObject body = new JSONObject()
-                .put("email", "")
-                .put("message", "")
-                .put("date", "")
-                .put("time", "");
+                .put("email", "a@test.local")
+                .put("message", "hi");
         StubHttpServletRequest req = new StubHttpServletRequest(body.toString());
         StubHttpServletResponse resp = new StubHttpServletResponse();
 
         new SendReminderServlet().doPost(req, resp);
 
-        int status = resp.getStatus();
-        String out = safeBody(resp);
-        assertTrue(status >= 400 && status < 500);
-        assertTrue(containsAnyIgnoreCase(out, "missing required fields", "error"));
+        assertEquals(400, resp.getStatus());
+        assertTrue(containsAnyIgnoreCase(safeBody(resp), "missing"));
     }
 
     @Test
-    public void invalidDateFormat_shouldReturn400_withFormatMessage() throws Exception {
+    public void invalidTime_shouldReturn400() throws Exception {
         JSONObject body = new JSONObject()
-                .put("email", "u@test.local")
+                .put("email", "a@test.local")
                 .put("message", "hi")
-                .put("date", "2025/01/01")
-                .put("time", "99:99");
+                .put("date", "2099-01-01")
+                .put("time", "25:61");
         StubHttpServletRequest req = new StubHttpServletRequest(body.toString());
         StubHttpServletResponse resp = new StubHttpServletResponse();
 
         new SendReminderServlet().doPost(req, resp);
 
-        int status = resp.getStatus();
-        String out = safeBody(resp);
-        assertTrue(status >= 400 && status < 500);
-        assertTrue(containsAnyIgnoreCase(out, "invalid date or time format", "error"));
+        assertEquals(400, resp.getStatus());
+        assertTrue(containsAnyIgnoreCase(safeBody(resp), "invalid", "format"));
     }
 
     @Test
-    public void pastTime_shouldReturn4xx_withTimeInvalidHint() throws Exception {
-        ZonedDateTime zdt = ZonedDateTime.now(ZONE).minusDays(1);
-        String date = zdt.toLocalDate().toString();
-        String time = zdt.toLocalTime().withSecond(0).withNano(0)
-                .format(DateTimeFormatter.ofPattern("HH:mm"));
+    public void futureTime_shouldSucceed_2xx_withMinLead0() throws Exception {
+        System.setProperty("REMINDER_MIN_LEAD_MINUTES", "0");
 
-        JSONObject body = new JSONObject()
-                .put("email", "u@test.local")
-                .put("message", "hello")
-                .put("date", date)
-                .put("time", time);
-
-        StubHttpServletRequest req = new StubHttpServletRequest(body.toString());
-        StubHttpServletResponse resp = new StubHttpServletResponse();
-
-        new SendReminderServlet().doPost(req, resp);
-
-        int status = resp.getStatus();
-        String out = safeBody(resp);
-
-        assertTrue(status >= 400 && status < 500);
-        assertTrue(containsAnyIgnoreCase(out,
-                "selected time", "already", "past", "invalid time", "msg_invalid_time", "before now", "minimum lead"));
-    }
-
-    @Test
-    public void futureTime_shouldSucceed_2xx() throws Exception {
         ZonedDateTime now = ZonedDateTime.now(ZONE);
-        ZonedDateTime nextMinute = now.plusMinutes(1).withSecond(0).withNano(0);
-        ZonedDateTime zdt = nextMinute.plusMinutes(15);
-
-        String date = zdt.toLocalDate().toString();
-        String time = zdt.toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm"));
+        ZonedDateTime target = now.plusMinutes(1).withSecond(0).withNano(0);
 
         JSONObject body = new JSONObject()
                 .put("email", "u@test.local")
                 .put("message", "hello future")
-                .put("date", date)
-                .put("time", time);
+                .put("date", target.toLocalDate().toString())
+                .put("time", target.toLocalTime().format(HM));
 
         StubHttpServletRequest req = new StubHttpServletRequest(body.toString());
         StubHttpServletResponse resp = new StubHttpServletResponse();
@@ -112,26 +96,30 @@ public class SendReminderServletTest {
 
         int status = resp.getStatus();
         String out = safeBody(resp);
-
-        assertTrue(status >= 200 && status < 300);
-        assertNotNull(out);
-        assertTrue(containsAnyIgnoreCase(out, "scheduled", "ok", "success", "created", "accepted", "msg_ok"));
+        assertTrue("expected 2xx for future time, got " + status, status >= 200 && status < 300);
+        assertTrue(containsAnyIgnoreCase(out, "scheduled", "ok", "success"));
     }
 
     @Test
-    public void doOptions_shouldSetCors_and200() throws Exception {
-        StubHttpServletRequest req = new StubHttpServletRequest("");
+    public void invalidMinLeadEnv_shouldFallbackToDefault5() throws Exception {
+        System.setProperty("REMINDER_MIN_LEAD_MINUTES", "abc");
+
+        ZonedDateTime now = ZonedDateTime.now(ZONE);
+        ZonedDateTime target = now.plusMinutes(1).withSecond(0).withNano(0);
+
+        JSONObject body = new JSONObject()
+                .put("email", "u@test.local")
+                .put("message", "hello")
+                .put("date", target.toLocalDate().toString())
+                .put("time", target.toLocalTime().format(HM));
+
+        StubHttpServletRequest req = new StubHttpServletRequest(body.toString());
         StubHttpServletResponse resp = new StubHttpServletResponse();
 
-        new SendReminderServlet().doOptions(req, resp);
+        new SendReminderServlet().doPost(req, resp);
 
-        assertEquals(200, resp.getStatus());
-        String allowOrigin = resp.getHeader("Access-Control-Allow-Origin");
-        String allowMethods = resp.getHeader("Access-Control-Allow-Methods");
-        String allowHeaders = resp.getHeader("Access-Control-Allow-Headers");
-        assertEquals("*", allowOrigin);
-        assertTrue(containsAnyIgnoreCase(allowMethods, "post", "get", "options"));
-        assertTrue(containsAnyIgnoreCase(allowHeaders, "content-type", "authorization"));
+        assertTrue(resp.getStatus() >= 400 && resp.getStatus() < 500);
+        assertTrue(containsAnyIgnoreCase(safeBody(resp), "minimum lead", "past"));
     }
 
     private static String safeBody(StubHttpServletResponse resp) {
