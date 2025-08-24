@@ -73,8 +73,10 @@ public class SendReminderServletTest {
         try {
             System.setProperty(LEAD_KEY, "0");
 
-            ZonedDateTime now = ZonedDateTime.now(ZONE);
-            ZonedDateTime zdt = now.plusMinutes(2).withSecond(0).withNano(0);
+            // 给足够的缓冲，避免 HH:mm 截断秒后的“回落”导致刚好不满足条件
+            ZonedDateTime zdt = ZonedDateTime.now(ZONE)
+                    .plusMinutes(10)     // 选择 +10 分钟，远离当前时刻
+                    .withSecond(0).withNano(0);
 
             String date = zdt.toLocalDate().toString();
             String time = zdt.toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm"));
@@ -107,8 +109,9 @@ public class SendReminderServletTest {
         try {
             System.setProperty(LEAD_KEY, "30");
 
-            ZonedDateTime now = ZonedDateTime.now(ZONE);
-            ZonedDateTime zdt = now.plusMinutes(5).withSecond(0).withNano(0);
+            ZonedDateTime zdt = ZonedDateTime.now(ZONE)
+                    .plusMinutes(5)   // 小于 30 分钟的最小提前，应该被拒绝
+                    .withSecond(0).withNano(0);
 
             String date = zdt.toLocalDate().toString();
             String time = zdt.toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm"));
@@ -135,7 +138,6 @@ public class SendReminderServletTest {
         }
     }
 
-    // ---------- helpers ----------
     private static String safeBody(StubHttpServletResponse resp) {
         String b = resp.getBody();
         return b == null ? "" : b;
