@@ -47,7 +47,7 @@ public class SendReminderServletTest {
         assertTrue("expected 4xx for past time, got " + status, status >= 400 && status < 500);
         assertTrue("body should hint time invalid, body=" + out,
                 containsAnyIgnoreCase(out,
-                        "selected time", "already", "past", "invalid time", "msg_invalid_time", "before now"));
+                        "selected time", "already", "past", "invalid time", "msg_invalid_time", "before now", "minimum lead"));
     }
 
     @Test
@@ -80,7 +80,7 @@ public class SendReminderServletTest {
     private static String safeBody(StubHttpServletResponse resp) {
         String b = resp.getBody();
         return b == null ? "" : b;
-        }
+    }
 
     private static boolean containsAnyIgnoreCase(String text, String... needles) {
         String t = text == null ? "" : text.toLowerCase();

@@ -30,43 +30,49 @@ public class EmailUtil {
 
         String username  = prop("MAIL_USERNAME", "SMTP_USER", "");
         String password  = prop("MAIL_PASSWORD", "SMTP_PASS", "");
-        String fromCfg   = prop("MAIL_FROM",     "SMTP_FROM", username);
+        String fromCfg   = prop("MAIL_FROM",     "SMTP_FROM",
+                !isBlank(username) ? username : "noreply@example.com");
+
 
         boolean doAuth = !isBlank(username) && !isBlank(password);
         if (!doAuth) {
             throw new MessagingException(
-                "SMTP auth required: set MAIL_USERNAME/SMTP_USER and MAIL_PASSWORD/SMTP_PASS (use a Gmail App Password).");
+                "SMTP auth required: set MAIL_USERNAME/SMTP_USER and MAIL_PASSWORD/SMTP_PASS (use Gmail App Password if using Gmail).");
         }
 
         String from;
         if ("smtp.gmail.com".equalsIgnoreCase(host)) {
-            from = username; // enforce
+            from = username;
         } else {
             from = isBlank(fromCfg) ? username : fromCfg;
         }
+
 
         Properties props = new Properties();
         props.put("mail.smtp.host", host);
         props.put("mail.smtp.port", port);
         props.put("mail.smtp.auth", "true");
+
+
         props.put("mail.smtp.starttls.enable", String.valueOf(starttls));
-        props.put("mail.smtp.starttls.required", "true"); // require TLS
+        if (starttls) {
+            props.put("mail.smtp.starttls.required", "true");
+        }
+
+        if (ssl) {
+            props.put("mail.smtp.ssl.enable", "true");
+            props.put("mail.smtp.starttls.enable", "false");
+        }
+
         props.put("mail.smtp.connectiontimeout", "10000");
         props.put("mail.smtp.timeout", "15000");
         props.put("mail.smtp.writetimeout", "15000");
         props.put("mail.smtp.ssl.protocols", "TLSv1.2 TLSv1.3");
         props.put("mail.smtp.ssl.trust", host);
-
-        if (ssl) {
-            props.put("mail.smtp.ssl.enable", "true");
-            props.put("mail.smtp.starttls.enable", "false");
-            props.put("mail.smtp.starttls.required", "false");
-        }
-
         props.put("mail.smtp.auth.mechanisms", "LOGIN PLAIN");
 
-        final String u = username;
-        final String p = password;
+
+        final String u = username, p = password;
         Session session = Session.getInstance(props, new Authenticator() {
             @Override protected PasswordAuthentication getPasswordAuthentication() {
                 return new PasswordAuthentication(u, p);
@@ -79,6 +85,7 @@ public class EmailUtil {
         message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(toEmail, false));
         message.setSubject(subject, StandardCharsets.UTF_8.name());
         message.setText(messageText, StandardCharsets.UTF_8.name());
+
         Transport.send(message);
     }
 }
