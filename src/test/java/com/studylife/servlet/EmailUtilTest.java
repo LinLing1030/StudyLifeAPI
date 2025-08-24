@@ -18,38 +18,37 @@ public class EmailUtilTest {
 
     @Before
     public void startSmtp() {
-        
-        smtp = new GreenMail(ServerSetupTest.SMTP);
+        smtp = new GreenMail(ServerSetupTest.SMTP); 
         smtp.start();
 
-        
-        System.setProperty("MAIL_USERNAME",  "noreply@test.local");
-        System.setProperty("MAIL_PASSWORD",  "dummy");
-        System.setProperty("MAIL_FROM",      "noreply@test.local");
+      
+        System.setProperty("SMTP_USER",     "noreply@test.local");
+        System.setProperty("SMTP_PASS",     "dummy");      
+        System.setProperty("SMTP_HOST",     "localhost");
+        System.setProperty("SMTP_PORT",     "3025");
 
-        System.setProperty("MAIL_SMTP_HOST", "localhost");
-        System.setProperty("MAIL_SMTP_PORT", "3025");
-        System.setProperty("MAIL_SMTP_AUTH", "false");
-        System.setProperty("MAIL_STARTTLS",  "false");
-        System.setProperty("MAIL_SSL",       "false");
+       
+        System.setProperty("SMTP_AUTH",     "false");
+        System.setProperty("SMTP_STARTTLS", "false");
+        System.setProperty("SMTP_SSL",      "false");
+
+       
+        System.setProperty("MAIL_DEBUG",    "true");
     }
 
     @After
     public void stopSmtp() {
-        if (smtp != null) {
-            smtp.stop();
-        }
-        
-        System.clearProperty("MAIL_USERNAME");
-        System.clearProperty("MAIL_PASSWORD");
-        System.clearProperty("MAIL_FROM");
-        System.clearProperty("MAIL_SMTP_HOST");
-        System.clearProperty("MAIL_SMTP_PORT");
-        System.clearProperty("MAIL_SMTP_AUTH");
-        System.clearProperty("MAIL_STARTTLS");
-        System.clearProperty("MAIL_SSL");
-    }
+        if (smtp != null) smtp.stop();
 
+        System.clearProperty("SMTP_USER");
+        System.clearProperty("SMTP_PASS");
+        System.clearProperty("SMTP_HOST");
+        System.clearProperty("SMTP_PORT");
+        System.clearProperty("SMTP_AUTH");
+        System.clearProperty("SMTP_STARTTLS");
+        System.clearProperty("SMTP_SSL");
+        System.clearProperty("MAIL_DEBUG");
+    }
     @Test
     public void sendPlainEmail_ok() throws Exception {
         EmailUtil.sendEmail("user@test.local", "Unit Test", "Hello from unit test.");

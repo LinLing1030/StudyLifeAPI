@@ -8,31 +8,51 @@ import javax.mail.internet.MimeMessage;
 
 public class EmailUtil {
 
-    
     private static boolean mailDebug() {
         String v = System.getenv("MAIL_DEBUG");
         return v != null && (v.equalsIgnoreCase("1") || v.equalsIgnoreCase("true"));
     }
 
-    public static void sendEmail(String toEmail, String subject, String messageText) throws MessagingException {
-        final String fromEmail = "llguo10300@gmail.com";
-        
-        final String password  = "ocfloicquityxiyu";
+    private static String env(String key, String def) {
+        String v = System.getenv(key);
+        return (v == null || v.trim().isEmpty()) ? def : v.trim();
+    }
 
+    public static void sendEmail(String toEmail, String subject, String messageText) throws MessagingException {
+        
+        final String fromEmail = env("SMTP_USER", null);
+        final String password  = env("SMTP_PASS", null);
+        final String host      = env("SMTP_HOST", "smtp.gmail.com");
+        final String portStr   = env("SMTP_PORT", "587"); 
+
+        if (fromEmail == null || password == null) {
+            throw new MessagingException("SMTP_USER / SMTP_PASS not configured in environment.");
+        }
+
+        
         Properties props = new Properties();
-        props.put("mail.smtp.host", "smtp.gmail.com");
-        props.put("mail.smtp.port", "587");
+        props.put("mail.smtp.host", host);
+        props.put("mail.smtp.port", portStr);
         props.put("mail.smtp.auth", "true");
-        props.put("mail.smtp.starttls.enable", "true");
-        props.put("mail.smtp.starttls.required", "true");
-        props.put("mail.smtp.ssl.trust", "smtp.gmail.com");
         props.put("mail.smtp.connectiontimeout", "8000");
         props.put("mail.smtp.timeout", "10000");
-        
+        props.put("mail.smtp.ssl.trust", host);
         props.put("mail.smtp.ssl.protocols", "TLSv1.2 TLSv1.3");
 
+        
+        if ("465".equals(portStr)) {
+            
+            props.put("mail.smtp.ssl.enable", "true");
+            props.put("mail.smtp.starttls.enable", "false");
+        } else {
+            
+            props.put("mail.smtp.starttls.enable", "true");
+            props.put("mail.smtp.starttls.required", "true");
+        }
+
         Session session = Session.getInstance(props, new Authenticator() {
-            @Override protected PasswordAuthentication getPasswordAuthentication() {
+            @Override
+            protected PasswordAuthentication getPasswordAuthentication() {
                 return new PasswordAuthentication(fromEmail, password);
             }
         });
@@ -41,8 +61,8 @@ public class EmailUtil {
         MimeMessage message = new MimeMessage(session);
         message.setFrom(new InternetAddress(fromEmail));
         message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(toEmail, false));
-        message.setSubject(subject, StandardCharsets.UTF_8.name());
-        message.setText(messageText, StandardCharsets.UTF_8.name());
+        message.setSubject(subject == null ? "" : subject, StandardCharsets.UTF_8.name());
+        message.setText(messageText == null ? "" : messageText, StandardCharsets.UTF_8.name());
 
         Transport.send(message);
     }
