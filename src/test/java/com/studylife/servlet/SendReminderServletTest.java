@@ -5,13 +5,15 @@ import org.junit.Test;
 import testsupport.StubHttpServletRequest;
 import testsupport.StubHttpServletResponse;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 
 import static org.junit.Assert.*;
 
 public class SendReminderServletTest {
+
+    private static final ZoneId ZONE = ZoneId.of("Europe/Dublin");
 
     @Test
     public void invalidJson_shouldReturn4xx_or5xx_withErrorBody() throws Exception {
@@ -30,11 +32,16 @@ public class SendReminderServletTest {
 
     @Test
     public void pastTime_shouldReturn4xx_withTimeInvalidHint() throws Exception {
+        ZonedDateTime zdt = ZonedDateTime.now(ZONE).minusDays(1);
+        String date = zdt.toLocalDate().toString();
+        String time = zdt.toLocalTime().withSecond(0).withNano(0)
+                .format(DateTimeFormatter.ofPattern("HH:mm"));
+
         JSONObject body = new JSONObject()
                 .put("email", "u@test.local")
                 .put("message", "hello")
-                .put("date", LocalDate.now().minusDays(1).toString())
-                .put("time", "00:01");
+                .put("date", date)
+                .put("time", time);
 
         StubHttpServletRequest req = new StubHttpServletRequest(body.toString());
         StubHttpServletResponse resp = new StubHttpServletResponse();
@@ -52,9 +59,12 @@ public class SendReminderServletTest {
 
     @Test
     public void futureTime_shouldSucceed_2xx() throws Exception {
-        LocalDateTime dt = LocalDateTime.now().plusMinutes(15);
-        String date = dt.toLocalDate().toString();
-        String time = dt.format(DateTimeFormatter.ofPattern("HH:mm"));
+        ZonedDateTime now = ZonedDateTime.now(ZONE);
+        ZonedDateTime nextMinute = now.plusMinutes(1).withSecond(0).withNano(0);
+        ZonedDateTime zdt = nextMinute.plusMinutes(15); 
+
+        String date = zdt.toLocalDate().toString();
+        String time = zdt.toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm"));
 
         JSONObject body = new JSONObject()
                 .put("email", "u@test.local")
@@ -75,6 +85,7 @@ public class SendReminderServletTest {
         assertTrue("body should acknowledge scheduling, body=" + out,
                 containsAnyIgnoreCase(out, "scheduled", "ok", "success", "created", "accepted", "msg_ok"));
     }
+
 
 
     private static String safeBody(StubHttpServletResponse resp) {
