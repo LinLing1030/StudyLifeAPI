@@ -38,7 +38,7 @@ public class LoginServletTest {
 
     @Test
     public void wrongPassword_returns401() throws Exception {
-        // 不存在的用户/密码
+     
         JSONObject in = new JSONObject().put("username", "abc").put("password", "xyz");
         HttpServletRequest req = mock(HttpServletRequest.class);
         when(req.getReader()).thenReturn(new BufferedReader(new StringReader(in.toString())));
@@ -55,7 +55,7 @@ public class LoginServletTest {
 
     @Test
     public void fallbackLogin_123_123_returns200_withUserId1() throws Exception {
-        // 触发 fallback：123/123 -> userId 1
+        
         JSONObject in = new JSONObject().put("username", "123").put("password", "123");
         HttpServletRequest req = mock(HttpServletRequest.class);
         when(req.getReader()).thenReturn(new BufferedReader(new StringReader(in.toString())));

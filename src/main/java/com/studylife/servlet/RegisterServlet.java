@@ -33,7 +33,7 @@ public class RegisterServlet extends HttpServlet {
         setCors(response);
         response.setContentType("application/json;charset=UTF-8");
 
-        // 读取 JSON 请求体
+        
         String body;
         try (BufferedReader br = request.getReader()) {
             body = br.lines().collect(Collectors.joining());
@@ -52,7 +52,7 @@ public class RegisterServlet extends HttpServlet {
                 return;
             }
 
-            // 加载驱动（新版本通常可省略，但保留兼容）
+            
             Class.forName("com.mysql.cj.jdbc.Driver");
 
             String url = "jdbc:mysql://127.0.0.1:3306/studylife_db"
@@ -60,7 +60,7 @@ public class RegisterServlet extends HttpServlet {
             String dbUser = "studyuser";
             String dbPass = "Study2025!";
 
-            // 1) 查重
+          
             String checkSql = "SELECT id FROM users WHERE username = ?";
 
             try (Connection conn = DriverManager.getConnection(url, dbUser, dbPass)) {
@@ -75,11 +75,11 @@ public class RegisterServlet extends HttpServlet {
                     }
                 }
 
-                // 2) 插入
+               
                 String insertSql = "INSERT INTO users(username, password) VALUES(?, ?)";
                 try (PreparedStatement ins = conn.prepareStatement(insertSql)) {
                     ins.setString(1, username);
-                    ins.setString(2, password); // 如需加密，这里替换为哈希后的密码
+                    ins.setString(2, password); 
                     ins.executeUpdate();
                 }
 

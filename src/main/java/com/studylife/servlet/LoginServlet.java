@@ -44,12 +44,12 @@ public class LoginServlet extends HttpServlet {
 
         final JSONObject result = new JSONObject();
 
-        // 解析 JSON
+       
         final JSONObject json;
         try {
             json = new JSONObject(body);
         } catch (JSONException ex) {
-            // 测试期望这里是 "error"
+           
             result.put("status", "error").put("message", "Invalid JSON");
             writeJson(response, HttpServletResponse.SC_BAD_REQUEST, result.toString());
             return;
@@ -66,14 +66,14 @@ public class LoginServlet extends HttpServlet {
 
         Integer userId = null;
 
-        // 先尝试数据库认证 —— 任何异常都吞掉并返回 null（不要 500）
+        
         try {
             userId = authenticateFromDb(username, password);
         } catch (Exception ignored) {
             userId = null;
         }
 
-        // 数据库没通过则走回退认证
+        
         if (userId == null) {
             userId = fallbackAuth(username, password); // 123/123 -> 1, 456/456 -> 3
         }
@@ -92,9 +92,9 @@ public class LoginServlet extends HttpServlet {
         }
     }
 
-    /** 返回用户 id；连不上或查不到都返回 null，不抛 500 */
+    
     private Integer authenticateFromDb(String username, String password) throws Exception {
-        // 读取环境变量（本地/CI 可不设置。没设置就直接返回 null）
+        
         String url  = System.getenv("DB_URL");
         String user = System.getenv("DB_USER");
         String pass = System.getenv("DB_PASS");
@@ -103,7 +103,7 @@ public class LoginServlet extends HttpServlet {
             return null;
         }
 
-        // MySQL 驱动（已由依赖提供）
+        
         Class.forName("com.mysql.cj.jdbc.Driver");
 
         String sql = "SELECT id FROM users WHERE username = ? AND password = ?";
@@ -123,7 +123,7 @@ public class LoginServlet extends HttpServlet {
         }
     }
 
-    /** 回退认证：123/123 -> 1；456/456 -> 3；否则 null */
+   
     private Integer fallbackAuth(String username, String password) {
         if ("123".equals(username) && "123".equals(password)) return 1;
         if ("456".equals(username) && "456".equals(password)) return 3;
