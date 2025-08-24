@@ -47,10 +47,7 @@ public class EmailUtil {
         props.put("mail.smtp.ssl.protocols", "TLSv1.2 TLSv1.3");
 
         Authenticator authenticator = null;
-        if (auth) {
-            if (isBlank(username) || isBlank(password)) {
-                throw new MessagingException("SMTP_USER / SMTP_PASS not configured in environment.");
-            }
+        if (auth && !isBlank(username) && !isBlank(password)) {
             authenticator = new Authenticator() {
                 @Override protected PasswordAuthentication getPasswordAuthentication() {
                     return new PasswordAuthentication(username, password);
