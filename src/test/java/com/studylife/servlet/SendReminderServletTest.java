@@ -6,34 +6,31 @@ import testsupport.StubHttpServletRequest;
 import testsupport.StubHttpServletResponse;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 import static org.junit.Assert.*;
+
 
 public class SendReminderServletTest {
 
     @Test
-    public void invalidJson_4xx_or_5xx() throws Exception {
-        // 传入非法 JSON 字符串
+    public void invalidJson_shouldReturn4xx_withErrorBody() throws Exception {
         StubHttpServletRequest req = new StubHttpServletRequest("{oops");
         StubHttpServletResponse resp = new StubHttpServletResponse();
 
         new SendReminderServlet().doPost(req, resp);
 
         int status = resp.getStatus();
-        String body = resp.getBody();
+        String body = safeBody(resp);
+        assertTrue("expected 4xx for invalid JSON, got " + status, status >= 400 && status < 500);
 
-        boolean hasErrWord = body != null &&
-                (body.toLowerCase().contains("error") || body.toLowerCase().contains("invalid"));
-
-        assertTrue(
-            "expect 4xx/5xx or error text, status=" + status + ", body=" + body,
-            (status >= 400 && status < 600) || hasErrWord
-        );
+        assertTrue("body should mention error/invalid, body=" + body,
+                containsAnyIgnoreCase(body, "error", "invalid", "malformed", "bad request", "MSG_"));
     }
 
-
     @Test
-    public void pastTime_shouldFail_400_like() throws Exception {
+    public void pastTime_shouldReturn4xx_withTimeInvalidHint() throws Exception {
         JSONObject body = new JSONObject()
                 .put("email", "u@test.local")
                 .put("message", "hello")
@@ -46,15 +43,52 @@ public class SendReminderServletTest {
         new SendReminderServlet().doPost(req, resp);
 
         int status = resp.getStatus();
-        assertTrue("expect >=400, got " + status, status >= 400);
+        String out = safeBody(resp);
 
-        String out = resp.getBody();
+        assertTrue("expected 4xx for past time, got " + status, status >= 400 && status < 500);
+        assertTrue("body should hint time invalid, body=" + out,
+                containsAnyIgnoreCase(out,
+                        "selected time", "already", "past", "invalid time", "MSG_INVALID_TIME", "before now"));
+    }
+
+    @Test
+    public void futureTime_shouldSucceed_2xx() throws Exception {
+        LocalDateTime dt = LocalDateTime.now().plusMinutes(5);
+        String date = dt.toLocalDate().toString();
+        String time = dt.format(DateTimeFormatter.ofPattern("HH:mm"));
+
+        JSONObject body = new JSONObject()
+                .put("email", "u@test.local")
+                .put("message", "hello future")
+                .put("date", date)
+                .put("time", time);
+
+        StubHttpServletRequest req = new StubHttpServletRequest(body.toString());
+        StubHttpServletResponse resp = new StubHttpServletResponse();
+
+        new SendReminderServlet().doPost(req, resp);
+
+        int status = resp.getStatus();
+        String out = safeBody(resp);
+
+        assertTrue("expected 2xx for future time, got " + status, status >= 200 && status < 300);
+
         assertNotNull(out);
-        assertTrue(
-            out.contains("Selected time") ||
-            out.contains("already") ||
-            out.contains("MSG_INVALID_TIME") ||
-            out.toLowerCase().contains("error")
-        );
+        assertTrue("body should acknowledge scheduling, body=" + out,
+                containsAnyIgnoreCase(out, "scheduled", "ok", "success", "created", "accepted", "MSG_OK"));
+    }
+
+
+    private static String safeBody(StubHttpServletResponse resp) {
+        String b = resp.getBody();
+        return b == null ? "" : b;
+    }
+
+    private static boolean containsAnyIgnoreCase(String text, String... needles) {
+        String t = text == null ? "" : text.toLowerCase();
+        for (String n : needles) {
+            if (n != null && t.contains(n.toLowerCase())) return true;
+        }
+        return false;
     }
 }
