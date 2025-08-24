@@ -6,7 +6,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import jakarta.mail.internet.MimeMessage;
+import javax.mail.internet.MimeMessage;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -17,9 +17,11 @@ public class EmailUtilTest {
 
     @Before
     public void startSmtp() {
-        smtp = new GreenMail(ServerSetupTest.SMTP); 
+        smtp = new GreenMail(ServerSetupTest.SMTP);
         smtp.start();
+
         smtp.setUser("noreply@test.local", "noreply@test.local", "dummy");
+
 
         System.setProperty("MAIL_SMTP_HOST", "localhost");
         System.setProperty("MAIL_SMTP_PORT", "3025");
@@ -42,6 +44,7 @@ public class EmailUtilTest {
     @After
     public void stopSmtp() {
         if (smtp != null) smtp.stop();
+
         String[] keys = {
             "MAIL_SMTP_HOST","MAIL_SMTP_PORT","MAIL_STARTTLS","MAIL_SSL",
             "MAIL_USERNAME","MAIL_PASSWORD","MAIL_FROM","MAIL_DEBUG",
@@ -67,7 +70,7 @@ public class EmailUtilTest {
         MimeMessage[] msgs = smtp.getReceivedMessages();
         assertEquals(1, msgs.length);
         assertEquals("HTML", msgs[0].getSubject());
-        String body = String.valueOf(msgs[0].getContent());
-        assertTrue(body.contains("<b>Hi</b>"));
+        String raw = new String(smtp.getReceivedMessages()[0].getRawInputStream().readAllBytes());
+        assertTrue(raw.contains("<b>Hi</b>"));
     }
 }

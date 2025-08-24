@@ -23,7 +23,7 @@
     <junit.version>4.13.2</junit.version>
     <mockito.version>5.12.0</mockito.version>
     <h2.version>2.2.224</h2.version>
-    <greenmail.version>2.1.1</greenmail.version>
+    <greenmail.version>1.6.14</greenmail.version>
     <slf4j.version>2.0.13</slf4j.version>
     <jacoco.version>0.8.12</jacoco.version>
     <surefire.version>3.2.5</surefire.version>
@@ -96,12 +96,12 @@
     </dependency>
 
     <!-- GreenMail: in-memory SMTP/IMAP/POP3 server for tests -->
-    <dependency>
-      <groupId>com.icegreen</groupId>
-      <artifactId>greenmail</artifactId>
-      <version>${greenmail.version}</version>
-      <scope>test</scope>
-    </dependency>
+<dependency>
+  <groupId>com.icegreen</groupId>
+  <artifactId>greenmail</artifactId>
+  <version>${greenmail.version}</version>
+  <scope>test</scope>
+</dependency>
 
     <!-- Silence SLF4J "StaticLoggerBinder" warnings in tests -->
     <dependency>
