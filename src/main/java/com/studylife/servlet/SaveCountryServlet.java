@@ -12,24 +12,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.sql.*;
 
-/**
- * POST /api/save-country
- * Body (JSON): { "userId": "123", "country": "Ireland" }
- */
 @WebServlet(name = "SaveCountryServlet", urlPatterns = {"/api/save-country"})
 public class SaveCountryServlet extends HttpServlet {
-
-
-    private static final String JDBC_URL =
-            "jdbc:mysql://127.0.0.1:3306/studylife_db"
-            + "?serverTimezone=UTC"
-            + "&useSSL=false"
-            + "&allowPublicKeyRetrieval=true"
-            + "&useUnicode=true&characterEncoding=utf8";
-
-    private static final String JDBC_USER = "studyuser";
-    private static final String JDBC_PWD  = "Study2025!";
-
 
     @Override
     protected void doOptions(HttpServletRequest req, HttpServletResponse resp)
@@ -49,13 +33,10 @@ public class SaveCountryServlet extends HttpServlet {
         StringBuilder body = new StringBuilder();
         try (BufferedReader reader = request.getReader()) {
             String line;
-            while ((line = reader.readLine()) != null) {
-                body.append(line);
-            }
+            while ((line = reader.readLine()) != null) body.append(line);
         }
 
         try {
-         
             JSONObject json = new JSONObject(body.toString());
             String userId  = json.optString("userId", "").trim();
             String country = json.optString("country", "").trim();
@@ -66,13 +47,20 @@ public class SaveCountryServlet extends HttpServlet {
                 return;
             }
 
+            String url    = System.getenv("DB_URL");
+            String dbUser = System.getenv("DB_USER");
+            String dbPass = System.getenv("DB_PASS");
+            if (isBlank(url) || isBlank(dbUser) || isBlank(dbPass)) {
+                response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+                response.getWriter().write("{\"status\":\"error\",\"message\":\"DB_URL/DB_USER/DB_PASS not set\"}");
+                return;
+            }
 
             Class.forName("com.mysql.cj.jdbc.Driver");
 
-
             String sql = "INSERT INTO user_login_locations (user_id, country) VALUES (?, ?)";
             long generatedId = -1L;
-            try (Connection conn = DriverManager.getConnection(JDBC_URL, JDBC_USER, JDBC_PWD);
+            try (Connection conn = DriverManager.getConnection(url, dbUser, dbPass);
                  PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
                 ps.setString(1, userId);
@@ -80,13 +68,10 @@ public class SaveCountryServlet extends HttpServlet {
                 ps.executeUpdate();
 
                 try (ResultSet rs = ps.getGeneratedKeys()) {
-                    if (rs.next()) {
-                        generatedId = rs.getLong(1);
-                    }
+                    if (rs.next()) generatedId = rs.getLong(1);
                 }
             }
 
-      
             JSONObject ok = new JSONObject();
             ok.put("status", "success");
             ok.put("id", generatedId);
@@ -96,17 +81,19 @@ public class SaveCountryServlet extends HttpServlet {
             response.getWriter().write(ok.toString());
 
         } catch (Exception e) {
-            e.printStackTrace();
             String msg = e.getMessage() == null ? "internal error" : e.getMessage().replace("\"", "\\\"");
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             response.getWriter().write("{\"status\":\"error\",\"message\":\"" + msg + "\"}");
         }
     }
 
-    
     private void addCorsHeaders(HttpServletResponse resp) {
         resp.setHeader("Access-Control-Allow-Origin", "*");
         resp.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS, DELETE");
         resp.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    }
+
+    private static boolean isBlank(String s) {
+        return s == null || s.trim().isEmpty();
     }
 }

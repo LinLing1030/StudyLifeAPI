@@ -33,7 +33,6 @@ public class RegisterServlet extends HttpServlet {
         setCors(response);
         response.setContentType("application/json;charset=UTF-8");
 
-        
         String body;
         try (BufferedReader br = request.getReader()) {
             body = br.lines().collect(Collectors.joining());
@@ -52,13 +51,21 @@ public class RegisterServlet extends HttpServlet {
                 return;
             }
 
+          
+            final String url    = System.getenv("DB_URL");
+            final String dbUser = System.getenv("DB_USER");
+            final String dbPass = System.getenv("DB_PASS");
+
+            if (isBlank(url) || isBlank(dbUser) || isBlank(dbPass)) {
+                response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+                result.put("status", "error")
+                      .put("message", "Database configuration is missing (DB_URL/DB_USER/DB_PASS).");
+                response.getWriter().write(result.toString());
+                return;
+            }
+
             
             Class.forName("com.mysql.cj.jdbc.Driver");
-
-            String url = "jdbc:mysql://127.0.0.1:3306/studylife_db"
-                    + "?serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true";
-            String dbUser = "studyuser";
-            String dbPass = "Study2025!";
 
           
             String checkSql = "SELECT id FROM users WHERE username = ?";
@@ -75,11 +82,11 @@ public class RegisterServlet extends HttpServlet {
                     }
                 }
 
-               
+                
                 String insertSql = "INSERT INTO users(username, password) VALUES(?, ?)";
                 try (PreparedStatement ins = conn.prepareStatement(insertSql)) {
                     ins.setString(1, username);
-                    ins.setString(2, password); 
+                    ins.setString(2, password);
                     ins.executeUpdate();
                 }
 
@@ -88,10 +95,14 @@ public class RegisterServlet extends HttpServlet {
         } catch (SQLIntegrityConstraintViolationException dup) {
             result.put("status", "fail").put("message", "Username already exists.");
         } catch (Exception e) {
-            e.printStackTrace();
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             result.put("status", "error").put("message", e.getMessage());
         }
 
         response.getWriter().write(result.toString());
+    }
+
+    private static boolean isBlank(String s) {
+        return s == null || s.trim().isEmpty();
     }
 }
