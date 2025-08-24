@@ -17,20 +17,29 @@ import java.util.logging.Logger;
 public class SendReminderServlet extends HttpServlet {
 
     private static final Logger LOG = Logger.getLogger(SendReminderServlet.class.getName());
-
-    private static final ScheduledExecutorService SCHEDULER =
-            Executors.newScheduledThreadPool(5);
-
     private static final ZoneId ZONE_ID = ZoneId.of("Europe/Dublin");
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("HH:mm");
     private static final DateTimeFormatter TS_FMT   = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    private static int minLeadMinutes() {
-        String v = System.getProperty("REMINDER_MIN_LEAD_MINUTES");
-        if (v == null || v.trim().isEmpty()) {
-            v = System.getenv("REMINDER_MIN_LEAD_MINUTES");
-        }
+    private final ScheduledExecutorService scheduler;
+    private final EmailSender sender;
+
+    public SendReminderServlet() {
+        this(Executors.newScheduledThreadPool(5), EmailUtil::sendEmail);
+    }
+
+    SendReminderServlet(ScheduledExecutorService scheduler, EmailSender sender) {
+        this.scheduler = scheduler;
+        this.sender = sender;
+    }
+
+    protected String getEnv(String key) {
+        return System.getenv(key);
+    }
+
+    private int minLeadMinutes() {
+        String v = getEnv("REMINDER_MIN_LEAD_MINUTES");
         if (v == null || v.trim().isEmpty()) return 5;
         try {
             return Math.max(0, Integer.parseInt(v.trim()));
@@ -103,9 +112,9 @@ public class SendReminderServlet extends HttpServlet {
             final String subject = "Reminder Alert";
             final String fullMsg = "⏰ Reminder at " + dateStr + " " + timeStr + ":\n\n" + message;
 
-            SCHEDULER.schedule(() -> {
+            scheduler.schedule(() -> {
                 try {
-                    EmailUtil.sendEmail(email, subject, fullMsg);
+                    sender.send(email, subject, fullMsg);
                     LOG.info(String.format("[Reminder] SENT -> %s at %s", email, TS_FMT.format(targetZ)));
                 } catch (Exception e) {
                     LOG.log(Level.SEVERE,
@@ -131,13 +140,13 @@ public class SendReminderServlet extends HttpServlet {
 
     @Override
     public void destroy() {
-        SCHEDULER.shutdown();
+        scheduler.shutdown();
         try {
-            if (!SCHEDULER.awaitTermination(5, TimeUnit.SECONDS)) {
-                SCHEDULER.shutdownNow();
+            if (!scheduler.awaitTermination(5, TimeUnit.SECONDS)) {
+                scheduler.shutdownNow();
             }
         } catch (InterruptedException e) {
-            SCHEDULER.shutdownNow();
+            scheduler.shutdownNow();
             Thread.currentThread().interrupt();
         }
         super.destroy();
@@ -156,5 +165,10 @@ public class SendReminderServlet extends HttpServlet {
             while ((line = r.readLine()) != null) sb.append(line);
         }
         return sb.toString();
+    }
+
+    @FunctionalInterface
+    interface EmailSender {
+        void send(String to, String subject, String body) throws Exception;
     }
 }
