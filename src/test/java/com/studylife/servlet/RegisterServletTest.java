@@ -7,15 +7,14 @@ import testsupport.StubHttpServletRequest;
 import testsupport.StubHttpServletResponse;
 
 import java.lang.reflect.Field;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.Statement;
+import java.sql.*;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+
 
 public class RegisterServletTest {
 
@@ -26,6 +25,8 @@ public class RegisterServletTest {
             sanitized.put(e.getKey(), e.getValue() == null ? "" : e.getValue());
         }
         try {
+            boolean fallbackToB = false;
+
             try {
                 Class<?> pe = Class.forName("java.lang.ProcessEnvironment");
                 Field f1 = pe.getDeclaredField("theEnvironment");
@@ -37,19 +38,22 @@ public class RegisterServletTest {
                 f2.setAccessible(true);
                 Map<String, String> cienv = (Map<String, String>) f2.get(null);
                 cienv.putAll(sanitized);
-                return;
-            } catch (ReflectiveOperationException noHotSpot) {
+                fallbackToB = false;
+            } catch (ReflectiveOperationException notHotSpot) {
+                fallbackToB = true;
             }
 
 
-            Map<String, String> env = System.getenv();
-            for (Class<?> cl : Collections.class.getDeclaredClasses()) {
-                if ("java.util.Collections$UnmodifiableMap".equals(cl.getName())) {
-                    Field m = cl.getDeclaredField("m");
-                    m.setAccessible(true);
-                    Map<String, String> map = (Map<String, String>) m.get(env);
-                    map.putAll(sanitized);
-                    break;
+            if (fallbackToB) {
+                Map<String, String> env = System.getenv();
+                for (Class<?> cl : Collections.class.getDeclaredClasses()) {
+                    if ("java.util.Collections$UnmodifiableMap".equals(cl.getName())) {
+                        Field m = cl.getDeclaredField("m");
+                        m.setAccessible(true);
+                        Map<String, String> map = (Map<String, String>) m.get(env);
+                        map.putAll(sanitized);
+                        break;
+                    }
                 }
             }
         } catch (Exception e) {
@@ -70,6 +74,7 @@ public class RegisterServletTest {
         clearDbEnv();
     }
 
+    // ============ 用例 ============
 
     @Test
     public void options_shouldReturn204() throws Exception {
@@ -77,7 +82,6 @@ public class RegisterServletTest {
         StubHttpServletResponse resp = new StubHttpServletResponse();
 
         new RegisterServlet().doOptions(req, resp);
-
         assertEquals(204, resp.getStatus());
     }
 
@@ -115,9 +119,10 @@ public class RegisterServletTest {
                 || result.contains("\"error\""));
     }
 
+
     @Test
-    public void insertPath_shouldHitExecuteUpdate_withH2() throws Exception {
-        final String url = "jdbc:h2:mem:reg_insert_path;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_UPPER=false";
+    public void insertPath_shouldReallyExecuteUpdate_withH2_andVerifyRow() throws Exception {
+        final String url = "jdbc:h2:mem:reg_insert_verify;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_UPPER=false";
         setEnv(new HashMap<String, String>() {{
             put("DB_URL", url);
             put("DB_USER", "sa");
@@ -133,7 +138,8 @@ public class RegisterServletTest {
                     ")");
         }
 
-        String freshUser = "user_" + System.currentTimeMillis();
+        final String freshUser = "u_" + System.nanoTime();
+
         JSONObject body = new JSONObject()
                 .put("username", freshUser)
                 .put("password", "p@ss");
@@ -143,13 +149,19 @@ public class RegisterServletTest {
 
         new RegisterServlet().doPost(req, resp);
 
+        int count;
+        try (Connection c2 = DriverManager.getConnection(url, "sa", "");
+             PreparedStatement ps = c2.prepareStatement("SELECT COUNT(*) FROM users WHERE username=?")) {
+            ps.setString(1, freshUser);
+            try (ResultSet rs = ps.executeQuery()) {
+                rs.next();
+                count = rs.getInt(1);
+            }
+        }
+        assertEquals("row must be inserted", 1, count);
 
-        String result = safe(resp).toLowerCase();
-        assertTrue("should look like json ok, body=" + result,
-                result.contains("\"status\"")
-                        || result.contains("success")
-                        || result.contains("ok")
-                        || result.contains("created"));
+        String out = safe(resp).toLowerCase();
+        assertTrue(out.contains("\"status\"") || out.contains("success") || out.contains("ok") || out.contains("created"));
     }
 
     @Test
