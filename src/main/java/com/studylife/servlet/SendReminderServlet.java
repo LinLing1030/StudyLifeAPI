@@ -10,23 +10,30 @@ import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.concurrent.*;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 @WebServlet("/SendReminderServlet")
 public class SendReminderServlet extends HttpServlet {
 
     private static final ScheduledExecutorService SCHEDULER =
             Executors.newScheduledThreadPool(5);
-    
+
     private static final ZoneId ZONE_ID = ZoneId.of("Europe/Dublin");
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("HH:mm");
     private static final DateTimeFormatter TS_FMT   = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
+    private static final Logger LOG = Logger.getLogger(SendReminderServlet.class.getName());
+
     private static int minLeadMinutes() {
         String v = System.getenv("REMINDER_MIN_LEAD_MINUTES");
         if (v == null || v.trim().isEmpty()) return 5;
-        try { return Math.max(0, Integer.parseInt(v.trim())); }
-        catch (NumberFormatException ignore) { return 5; }
+        try {
+            return Math.max(0, Integer.parseInt(v.trim()));
+        } catch (NumberFormatException ignore) {
+            return 5;
+        }
     }
 
     @Override
@@ -56,8 +63,8 @@ public class SendReminderServlet extends HttpServlet {
             }
 
             String email   = json.optString("email", "").trim();
-            String dateStr = json.optString("date", "").trim(); 
-            String timeStr = json.optString("time", "").trim(); 
+            String dateStr = json.optString("date", "").trim();
+            String timeStr = json.optString("time", "").trim();
             String message = json.optString("message", "").trim();
 
             if (email.isEmpty() || dateStr.isEmpty() || timeStr.isEmpty() || message.isEmpty()) {
@@ -96,14 +103,12 @@ public class SendReminderServlet extends HttpServlet {
             SCHEDULER.schedule(() -> {
                 try {
                     EmailUtil.sendEmail(email, subject, fullMsg);
-                    System.out.println("[Reminder] SENT -> " + email + " at " + TS_FMT.format(targetZ));
+                    LOG.info(String.format("[Reminder] SENT -> %s at %s", email, TS_FMT.format(targetZ)));
                 } catch (Exception e) {
-                    System.err.println("[Reminder] FAILED -> " + email + " at " + TS_FMT.format(targetZ)
-                            + " : " + e.getMessage());
-                    e.printStackTrace();
+                    LOG.log(Level.SEVERE,
+                            String.format("[Reminder] FAILED -> %s at %s", email, TS_FMT.format(targetZ)), e);
                 }
             }, delayMillis, TimeUnit.MILLISECONDS);
-
 
             JSONObject res = new JSONObject()
                     .put("status", "scheduled")
@@ -113,7 +118,7 @@ public class SendReminderServlet extends HttpServlet {
             out.print(res.toString());
 
         } catch (Exception e) {
-            e.printStackTrace();
+            LOG.log(Level.SEVERE, "Unhandled error while scheduling reminder", e);
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             try (PrintWriter out = response.getWriter()) {
                 out.print("{\"status\":\"error\",\"message\":\"server error\"}");
