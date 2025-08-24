@@ -16,7 +16,6 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
-    <!-- Compile for Java 11 runtime -->
     <java.version>11</java.version>
 
     <!-- Versions -->
@@ -30,7 +29,7 @@
   </properties>
 
   <dependencies>
-    <!-- Servlet API provided by container (Tomcat) -->
+    <!-- Servlet API  -->
     <dependency>
       <groupId>javax.servlet</groupId>
       <artifactId>javax.servlet-api</artifactId>
@@ -73,7 +72,7 @@
       <version>1.2.0</version>
     </dependency>
 
-    <!-- ===== Test deps ===== -->
+    <!-- ====== Test deps ====== -->
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
@@ -95,15 +94,14 @@
       <scope>test</scope>
     </dependency>
 
-    <!-- GreenMail: in-memory SMTP/IMAP/POP3 server for tests -->
-<dependency>
-  <groupId>com.icegreen</groupId>
-  <artifactId>greenmail</artifactId>
-  <version>${greenmail.version}</version>
-  <scope>test</scope>
-</dependency>
+    <!-- GreenMail -->
+    <dependency>
+      <groupId>com.icegreen</groupId>
+      <artifactId>greenmail</artifactId>
+      <version>${greenmail.version}</version>
+      <scope>test</scope>
+    </dependency>
 
-    <!-- Silence SLF4J "StaticLoggerBinder" warnings in tests -->
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-simple</artifactId>
@@ -113,7 +111,6 @@
   </dependencies>
 
   <build>
-    <!-- Final WAR name -->
     <finalName>StudyLifeAPI</finalName>
 
     <plugins>
@@ -127,7 +124,7 @@
         </configuration>
       </plugin>
 
-      <!-- WAR packaging -->
+      <!-- WAR -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-war-plugin</artifactId>
@@ -138,14 +135,17 @@
         </configuration>
       </plugin>
 
-      <!-- Unit tests -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <version>${surefire.version}</version>
+        <configuration>
+          <!--  JaCoCo 的 ${argLine}，并追加 add-opens 解决 InaccessibleObjectException -->
+          <argLine>${argLine} --add-opens java.base/java.util=ALL-UNNAMED --add-opens java.base/java.lang=ALL-UNNAMED</argLine>
+        </configuration>
       </plugin>
 
-      <!-- JaCoCo coverage -->
+      <!-- JaCoCo -->
       <plugin>
         <groupId>org.jacoco</groupId>
         <artifactId>jacoco-maven-plugin</artifactId>
@@ -167,13 +167,14 @@
         </executions>
       </plugin>
 
-      <!-- Sonar -->
+      <!-- SonarScanner -->
       <plugin>
         <groupId>org.sonarsource.scanner.maven</groupId>
         <artifactId>sonar-maven-plugin</artifactId>
         <version>3.9.1.2184</version>
       </plugin>
 
+      <!-- Enforcer： JDK 11~17  -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-enforcer-plugin</artifactId>
