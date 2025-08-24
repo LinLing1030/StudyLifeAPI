@@ -1,56 +1,56 @@
 package com.studylife.servlet;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Properties;
 import javax.mail.*;
 import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage;
-import java.nio.charset.StandardCharsets;
-import java.util.Properties;
 
 public class EmailUtil {
 
-    private static String propOrEnv(String propKey, String envKey, String defVal) {
-        String v = System.getProperty(propKey);
-        if (v == null || v.isEmpty()) v = System.getenv(envKey);
-        return (v == null || v.isEmpty()) ? defVal : v;
+    private static String prop(String sysKey, String envKey, String defVal) {
+        String v = System.getProperty(sysKey);
+        if (v == null || v.trim().isEmpty()) v = System.getenv(envKey);
+        return (v == null || v.trim().isEmpty()) ? defVal : v.trim();
     }
-
-    private static boolean boolPropOrEnv(String propKey, String envKey, boolean defVal) {
-        String s = propOrEnv(propKey, envKey, null);
-        if (s == null) return defVal;
-        return "1".equals(s) || "true".equalsIgnoreCase(s) || "yes".equalsIgnoreCase(s);
+    private static boolean propBool(String sysKey, String envKey, boolean defVal) {
+        String v = prop(sysKey, envKey, defVal ? "true" : "false");
+        return "1".equalsIgnoreCase(v) || "true".equalsIgnoreCase(v) || "yes".equalsIgnoreCase(v);
     }
-
-    private static boolean isBlank(String s) {
-        return s == null || s.trim().isEmpty();
-    }
+    private static boolean isBlank(String s) { return s == null || s.trim().isEmpty(); }
 
     public static void sendEmail(String toEmail, String subject, String messageText) throws MessagingException {
-        String host     = propOrEnv("MAIL_SMTP_HOST", "SMTP_HOST", "smtp.gmail.com");
-        String port     = propOrEnv("MAIL_SMTP_PORT", "SMTP_PORT", "587");
-        boolean auth    = boolPropOrEnv("MAIL_SMTP_AUTH", "SMTP_AUTH", true);
-        boolean starttls= boolPropOrEnv("MAIL_STARTTLS",   "SMTP_STARTTLS", true);
-        boolean ssl     = boolPropOrEnv("MAIL_SSL",        "SMTP_SSL", false);
-        boolean debug   = boolPropOrEnv("MAIL_DEBUG",      "SMTP_DEBUG", false);
+        String host     = prop("MAIL_SMTP_HOST", "SMTP_HOST", "smtp.gmail.com");
+        String port     = prop("MAIL_SMTP_PORT", "SMTP_PORT", "587");
+        boolean auth    = propBool("MAIL_SMTP_AUTH", "SMTP_AUTH", true);
+        boolean starttls= propBool("MAIL_STARTTLS",  "SMTP_STARTTLS", true);
+        boolean ssl     = propBool("MAIL_SSL",       "SMTP_SSL", false);
+        boolean debug   = propBool("MAIL_DEBUG",     "SMTP_DEBUG", false);
 
-        String username = propOrEnv("MAIL_USERNAME", "SMTP_USER", null);
-        String password = propOrEnv("MAIL_PASSWORD", "SMTP_PASS", null);
-        String from     = propOrEnv("MAIL_FROM",     "SMTP_FROM", username); 
+        String username = prop("MAIL_USERNAME", "SMTP_USER", "");
+        String password = prop("MAIL_PASSWORD", "SMTP_PASS", "");
+        String from     = prop("MAIL_FROM",     "SMTP_FROM",
+                !isBlank(username) ? username : "noreply@example.com");
 
         Properties props = new Properties();
         props.put("mail.smtp.host", host);
         props.put("mail.smtp.port", port);
-        props.put("mail.smtp.auth", String.valueOf(auth));
+        boolean doAuth = auth && !isBlank(username) && !isBlank(password);
+        props.put("mail.smtp.auth", String.valueOf(doAuth));
+
         props.put("mail.smtp.starttls.enable", String.valueOf(starttls));
-        props.put("mail.smtp.ssl.enable", String.valueOf(ssl));
+        if (ssl) props.put("mail.smtp.ssl.enable", "true");
+
         props.put("mail.smtp.connectiontimeout", "8000");
         props.put("mail.smtp.timeout", "10000");
         props.put("mail.smtp.ssl.protocols", "TLSv1.2 TLSv1.3");
 
         Authenticator authenticator = null;
-        if (auth && !isBlank(username) && !isBlank(password)) {
+        if (doAuth) {
+            final String u = username, p = password;
             authenticator = new Authenticator() {
                 @Override protected PasswordAuthentication getPasswordAuthentication() {
-                    return new PasswordAuthentication(username, password);
+                    return new PasswordAuthentication(u, p);
                 }
             };
         }
@@ -59,7 +59,7 @@ public class EmailUtil {
         session.setDebug(debug);
 
         MimeMessage message = new MimeMessage(session);
-        message.setFrom(new InternetAddress(isBlank(from) ? "noreply@localhost" : from));
+        message.setFrom(new InternetAddress(from));
         message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(toEmail, false));
         message.setSubject(subject, StandardCharsets.UTF_8.name());
         message.setText(messageText, StandardCharsets.UTF_8.name());
