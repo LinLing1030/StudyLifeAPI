@@ -16,6 +16,8 @@ import java.util.logging.Logger;
 @WebServlet("/SendReminderServlet")
 public class SendReminderServlet extends HttpServlet {
 
+    private static final Logger LOG = Logger.getLogger(SendReminderServlet.class.getName());
+
     private static final ScheduledExecutorService SCHEDULER =
             Executors.newScheduledThreadPool(5);
 
@@ -24,10 +26,11 @@ public class SendReminderServlet extends HttpServlet {
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("HH:mm");
     private static final DateTimeFormatter TS_FMT   = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    private static final Logger LOG = Logger.getLogger(SendReminderServlet.class.getName());
-
     private static int minLeadMinutes() {
-        String v = System.getenv("REMINDER_MIN_LEAD_MINUTES");
+        String v = System.getProperty("REMINDER_MIN_LEAD_MINUTES");
+        if (v == null || v.trim().isEmpty()) {
+            v = System.getenv("REMINDER_MIN_LEAD_MINUTES");
+        }
         if (v == null || v.trim().isEmpty()) return 5;
         try {
             return Math.max(0, Integer.parseInt(v.trim()));
