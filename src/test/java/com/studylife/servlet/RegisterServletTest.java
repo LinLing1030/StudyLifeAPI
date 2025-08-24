@@ -18,6 +18,7 @@ import static org.junit.Assert.assertTrue;
 
 public class RegisterServletTest {
 
+
     @SuppressWarnings("unchecked")
     private static void setEnv(Map<String, String> patch) {
         Map<String, String> sanitized = new HashMap<>();
@@ -31,18 +32,14 @@ public class RegisterServletTest {
                 Class<?> pe = Class.forName("java.lang.ProcessEnvironment");
                 Field f1 = pe.getDeclaredField("theEnvironment");
                 f1.setAccessible(true);
-                Map<String, String> env = (Map<String, String>) f1.get(null);
-                env.putAll(sanitized);
+                ((Map<String, String>) f1.get(null)).putAll(sanitized);
 
                 Field f2 = pe.getDeclaredField("theCaseInsensitiveEnvironment");
                 f2.setAccessible(true);
-                Map<String, String> cienv = (Map<String, String>) f2.get(null);
-                cienv.putAll(sanitized);
-                fallbackToB = false;
+                ((Map<String, String>) f2.get(null)).putAll(sanitized);
             } catch (ReflectiveOperationException notHotSpot) {
                 fallbackToB = true;
             }
-
 
             if (fallbackToB) {
                 Map<String, String> env = System.getenv();
@@ -50,8 +47,7 @@ public class RegisterServletTest {
                     if ("java.util.Collections$UnmodifiableMap".equals(cl.getName())) {
                         Field m = cl.getDeclaredField("m");
                         m.setAccessible(true);
-                        Map<String, String> map = (Map<String, String>) m.get(env);
-                        map.putAll(sanitized);
+                        ((Map<String, String>) m.get(env)).putAll(sanitized);
                         break;
                     }
                 }
@@ -74,7 +70,6 @@ public class RegisterServletTest {
         clearDbEnv();
     }
 
-    // ============ 用例 ============
 
     @Test
     public void options_shouldReturn204() throws Exception {
@@ -122,14 +117,17 @@ public class RegisterServletTest {
 
     @Test
     public void insertPath_shouldReallyExecuteUpdate_withH2_andVerifyRow() throws Exception {
-        final String url = "jdbc:h2:mem:reg_insert_verify;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_UPPER=false";
+        final String url  = "jdbc:h2:mem:reg_insert_verify;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_UPPER=false";
+        final String user = "sa";
+        final String pass = "x"; 
+
         setEnv(new HashMap<String, String>() {{
             put("DB_URL", url);
-            put("DB_USER", "sa");
-            put("DB_PASS", "");
+            put("DB_USER", user);
+            put("DB_PASS", pass);
         }});
 
-        try (Connection c = DriverManager.getConnection(url, "sa", "");
+        try (Connection c = DriverManager.getConnection(url, user, pass);
              Statement st = c.createStatement()) {
             st.execute("CREATE TABLE IF NOT EXISTS users (" +
                     "id INT AUTO_INCREMENT PRIMARY KEY," +
@@ -149,8 +147,9 @@ public class RegisterServletTest {
 
         new RegisterServlet().doPost(req, resp);
 
+
         int count;
-        try (Connection c2 = DriverManager.getConnection(url, "sa", "");
+        try (Connection c2 = DriverManager.getConnection(url, user, pass);
              PreparedStatement ps = c2.prepareStatement("SELECT COUNT(*) FROM users WHERE username=?")) {
             ps.setString(1, freshUser);
             try (ResultSet rs = ps.executeQuery()) {
@@ -166,14 +165,17 @@ public class RegisterServletTest {
 
     @Test
     public void duplicatedUsername_shouldFail_withH2() throws Exception {
-        final String url = "jdbc:h2:mem:reg_dup;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_UPPER=false";
+        final String url  = "jdbc:h2:mem:reg_dup;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_UPPER=false";
+        final String user = "sa";
+        final String pass = "x"; 
+
         setEnv(new HashMap<String, String>() {{
             put("DB_URL", url);
-            put("DB_USER", "sa");
-            put("DB_PASS", "");
+            put("DB_USER", user);
+            put("DB_PASS", pass);
         }});
 
-        try (Connection c = DriverManager.getConnection(url, "sa", "");
+        try (Connection c = DriverManager.getConnection(url, user, pass);
              Statement st = c.createStatement()) {
             st.execute("CREATE TABLE IF NOT EXISTS users (" +
                     "id INT AUTO_INCREMENT PRIMARY KEY," +
@@ -197,6 +199,7 @@ public class RegisterServletTest {
                 || result.contains("fail")
                 || result.contains("\"status\""));
     }
+
 
     private static String safe(StubHttpServletResponse resp) {
         String b = resp.getBody();
